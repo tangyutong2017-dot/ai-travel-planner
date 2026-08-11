@@ -39,10 +39,8 @@ function AttractionCard({ item, onClick, onDelete, onEdit }: {
           <p className="mt-1 truncate text-[10px] font-mono text-slate-400">地址 · {item.address}</p>
         )}
         <div className="flex items-center gap-2 mt-2">
-          <div className="flex gap-0.5">
-            {[1, 2, 3, 4, 5].map((i) => <div key={i} className={`w-2 h-2 rounded-full ${i <= 4 ? "bg-amber-400" : "bg-slate-200"}`} />)}
-          </div>
-          <span className="text-[10px] font-mono text-slate-500">4.2 · 预计 {item.durationLabel} · {item.cost === 0 ? "免费" : `¥${item.cost}`}</span>
+          {/* 评分曾是写死的 4.2 + 四颗星。数据模型里没有评分字段，接入真实 POI 评分前不展示。 */}
+          <span className="text-[10px] font-mono text-slate-500">预计 {item.durationLabel} · {item.cost === 0 ? "免费" : `¥${item.cost}`}</span>
         </div>
       </div>
       <div className="flex flex-col gap-1 shrink-0">
@@ -183,7 +181,9 @@ function RightPanel({ day, onOutput }: { day: DayPlan; onOutput: () => void }) {
   const totalItems = Math.max(day.items.length, 1);
 
   return (
-    <div className="w-64 border-l border-slate-200 bg-white/90 backdrop-blur flex flex-col shrink-0 overflow-auto">
+    // < 1280px 时隐藏：四栏固定宽度合计 640px，再窄中间时间线会被压成竖排文字。
+    // 隐藏后「输出行程方案」CTA 由中栏头部的 xl:hidden 按钮接管。
+    <div className="hidden xl:flex w-64 border-l border-slate-200 bg-white/90 backdrop-blur flex-col shrink-0 overflow-auto">
       <CollapsibleSection title="地图预览" badge="路线" defaultOpen={true}>
         <RouteMiniMap day={day} />
         <div className="mt-2 space-y-0.5">
@@ -478,7 +478,8 @@ export function PageWorkspace({
 
   return (
     <div className="flex-1 flex overflow-hidden">
-      <div className="w-40 border-r border-slate-200 bg-white flex flex-col shrink-0">
+      {/* < 1024px 时改用中栏顶部的横向日程条 */}
+      <div className="hidden lg:flex w-40 border-r border-slate-200 bg-white flex-col shrink-0">
         <div className="p-3 border-b border-slate-100">
           <WAnnotation text="日程导航" />
           <p className="text-xs font-semibold text-slate-700 mt-0.5">{itinerary.destination} · {itinerary.days.length}天</p>
@@ -503,12 +504,35 @@ export function PageWorkspace({
       </div>
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="border-b border-slate-200 bg-white/95 px-4 py-3 flex items-center justify-between shrink-0 shadow-sm shadow-slate-200/50">
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-slate-900">第{day.day}天 · {day.date} · {day.title}</span>
-            <WAnnotation text="← 当天主题自动生成" />
+        <div className="border-b border-slate-200 bg-white/95 px-4 py-3 shrink-0 shadow-sm shadow-slate-200/50">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="truncate text-sm font-semibold text-slate-900">第{day.day}天 · {day.date} · {day.title}</span>
+              <span className="hidden xl:block"><WAnnotation text="← 当天主题自动生成" /></span>
+            </div>
+            <div className="hidden xl:block"><WAnnotation text="复杂调整请使用下方 AI 输入框" /></div>
+            {/* 右栏在 < 1280px 时隐藏，主 CTA 移到这里，避免用户找不到「输出方案」 */}
+            <div className="xl:hidden shrink-0">
+              <WBtn label="输出行程方案 →" primary small onClick={onOutput} />
+            </div>
           </div>
-          <WAnnotation text="复杂调整请使用下方 AI 输入框" />
+
+          {/* < 1024px 时替代左侧日程栏 */}
+          <div className="lg:hidden -mb-1 mt-2.5 flex gap-1.5 overflow-x-auto pb-1">
+            {itinerary.days.map((dayItem, index) => (
+              <button
+                key={dayItem.day}
+                onClick={() => setActiveDay(index)}
+                className={`shrink-0 rounded-full border px-3 py-1 text-[11px] font-mono transition-colors ${
+                  index === activeDay
+                    ? "border-sky-500 bg-sky-600 text-white"
+                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                第{dayItem.day}天
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="flex-1 overflow-auto p-4">

@@ -293,6 +293,17 @@ def get_itinerary(db: Session, trip_id: str) -> Itinerary | None:
     return itinerary_from_record(record)
 
 
+PLACEHOLDER_SOURCE = "placeholder"
+
+
+def is_placeholder_item(item: dict) -> bool:
+    """占位条目没有真实景点名，不能拿去高德搜索。
+
+    新数据靠 source 标记识别；`_seed` 后缀是给标记落地之前的历史数据兜底。
+    """
+    return item.get("source") == PLACEHOLDER_SOURCE or str(item.get("id") or "").endswith("_seed")
+
+
 def fill_missing_poi_data(record: ItineraryRecord) -> bool:
     days = deepcopy(record.days_json)
     changed = False
@@ -305,6 +316,10 @@ def fill_missing_poi_data(record: ItineraryRecord) -> bool:
             if not isinstance(item, dict):
                 continue
             if item.get("location") and item.get("poiId") and item.get("imageUrl"):
+                continue
+            # 用「围绕「自然风光」生成核心安排」这种标题去搜，会匹配到无关 POI，
+            # 于是界面上出现假评分和假坐标。
+            if is_placeholder_item(item):
                 continue
 
             try:
@@ -516,6 +531,7 @@ def create_placeholder_itinerary(trip_id: str, payload: CreateTripPayload) -> It
                         "durationLabel": "2h",
                         "cost": 0,
                         "reason": "当前为后端占位数据，下一步由 LangGraph agent 生成真实安排",
+                        "source": PLACEHOLDER_SOURCE,
                     }
                 ],
             }

@@ -9,11 +9,22 @@ type WizardStep = "create" | "preferences" | "generating";
 
 type WizardForm = CreateTripPayload;
 
+// 默认出发日取「今天 +7 天」，默认 5 天行程。
+// 曾经写死成 2026-08-10，日子一过就成了过去的日期。
+const isoDate = (offsetDays: number) => {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDays);
+  return date.toISOString().slice(0, 10);
+};
+
+const DEFAULT_TRIP_DAYS = 5;
+
 const initialForm: WizardForm = {
-  destination: "云南大理",
-  startDate: "2026-08-10",
-  endDate: "2026-08-14",
-  days: 5,
+  // 目的地必须留空：填了默认值会让用户不知不觉创建一条别人的行程
+  destination: "",
+  startDate: isoDate(7),
+  endDate: isoDate(7 + DEFAULT_TRIP_DAYS - 1),
+  days: DEFAULT_TRIP_DAYS,
   travelers: {
     adults: 2,
     children: 0,
