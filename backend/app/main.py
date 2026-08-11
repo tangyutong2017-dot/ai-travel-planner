@@ -5,13 +5,10 @@ from sqlalchemy.orm import Session
 
 from .agent import get_generation_job, run_generation_job, start_generation_job
 from .db import get_db, init_db, SessionLocal
-from .editing_graph import edit_itinerary
 from .models import (
     AgentJob,
     CreateTripPayload,
     CreateTripResponse,
-    EditItineraryPayload,
-    EditItineraryResponse,
     GenerateTripResponse,
     Itinerary,
     Trip,
@@ -20,7 +17,7 @@ from .models import (
     UpdateItineraryItemPayload,
     UpdateTripPayload,
 )
-from .repository import create_trip, delete_itinerary_item, delete_trip, get_itinerary, get_trip, list_trips, save_itinerary, seed_initial_data, update_itinerary_item, update_trip_name
+from .repository import create_trip, delete_itinerary_item, delete_trip, get_itinerary, get_trip, list_trips, seed_initial_data, update_itinerary_item, update_trip_name
 
 
 app = FastAPI(title="Travel Planner API", version="0.1.0")
@@ -128,27 +125,6 @@ def update_trip_item_route(
         raise HTTPException(status_code=404, detail="Itinerary item not found")
 
     return updated
-
-
-@app.post("/api/trips/{trip_id}/edit", response_model=EditItineraryResponse)
-def edit_trip_route(
-    trip_id: str,
-    payload: EditItineraryPayload,
-    db: Session = Depends(get_db),
-) -> EditItineraryResponse:
-    itinerary = get_itinerary(db, trip_id)
-    if not itinerary:
-        if not get_trip(db, trip_id):
-            raise HTTPException(status_code=404, detail="Trip not found")
-        raise HTTPException(status_code=409, detail="Trip itinerary has not been generated")
-
-    try:
-        message, updated = edit_itinerary(itinerary, payload.instruction, payload.activeDay)
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Editing Agent failed: {exc}") from exc
-
-    save_itinerary(db, trip_id, updated)
-    return EditItineraryResponse(message=message, itinerary=updated)
 
 
 @app.post("/api/trips/{trip_id}/generate", response_model=GenerateTripResponse)

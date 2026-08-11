@@ -1,8 +1,8 @@
 from .db import SessionLocal
-from .generation_fast import generate_fast_itinerary
 from .models import AgentJob
 from .repository import (
     create_agent_job,
+    create_placeholder_itinerary,
     get_agent_job,
     get_trip,
     get_trip_payload,
@@ -21,7 +21,14 @@ def start_generation_job(trip_id: str) -> AgentJob:
 
 
 def run_generation_job(job_id: str) -> None:
-    """Run the fast MVP generation workflow for one trip."""
+    """Fill one trip with a placeholder itinerary.
+
+    The Generation Agent is being redesigned. This function keeps the
+    job lifecycle (create -> running -> succeeded/failed) and the
+    ``GET /api/jobs/{job_id}`` polling contract intact, so the wizard and
+    the workspace still work end to end. Swap the placeholder call below
+    for the new agent when it lands.
+    """
     db = SessionLocal()
     try:
         job = get_agent_job(db, job_id)
@@ -40,20 +47,17 @@ def run_generation_job(job_id: str) -> None:
             return
 
         update_agent_job(db, job_id, "running", 35, "正在生成初版行程")
-        itinerary, metadata = generate_fast_itinerary(job.tripId, payload)
+        itinerary = create_placeholder_itinerary(job.tripId, payload)
 
         update_agent_job(db, job_id, "running", 88, "正在保存行程并同步工作区")
         save_itinerary(db, job.tripId, itinerary)
 
-        evaluation = metadata.get("evaluation") or {}
-        score = evaluation.get("score")
-        suffix = f"；质量评分 {score}" if score is not None else ""
         update_agent_job(
             db,
             job_id,
             "succeeded",
             100,
-            f"行程已生成，可进入工作区继续编辑{suffix}",
+            "已生成占位行程；Generation Agent 重写中",
         )
     except Exception as exc:
         db.rollback()

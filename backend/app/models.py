@@ -106,16 +106,6 @@ class UpdateItineraryItemPayload(BaseModel):
     reason: str | None = None
 
 
-class EditItineraryPayload(BaseModel):
-    instruction: str = Field(min_length=1, max_length=1200)
-    activeDay: int | None = Field(default=None, ge=1)
-
-
-class EditItineraryResponse(BaseModel):
-    message: str
-    itinerary: "Itinerary"
-
-
 class DayRoute(BaseModel):
     distanceKm: float
     walkKm: float

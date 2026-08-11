@@ -77,16 +77,3 @@ export async function updateTripItem(
   return apiPatch<Itinerary, UpdateTripItemPayload>(`/api/trips/${tripId}/days/${day}/items/${itemId}`, payload)
 }
 
-export type EditTripPayload = {
-  instruction: string
-  activeDay?: number
-}
-
-export type EditTripResponse = {
-  message: string
-  itinerary: Itinerary
-}
-
-export async function editTrip(tripId: string, payload: EditTripPayload): Promise<EditTripResponse> {
-  return apiPost<EditTripResponse, EditTripPayload>(`/api/trips/${tripId}/edit`, payload)
-}

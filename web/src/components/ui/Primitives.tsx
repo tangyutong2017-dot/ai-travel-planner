@@ -28,17 +28,6 @@ export function WImgBox({ className = "", label = "图片占位" }: { className?
   );
 }
 
-export function WInput({ placeholder, label }: { placeholder: string; label?: string }) {
-  return (
-    <div className="flex flex-col gap-1">
-      {label && <span className="text-xs font-medium text-gray-600">{label}</span>}
-      <div className="rounded-md border border-slate-200 bg-slate-50 h-9 px-3 flex items-center">
-        <span className="text-[11px] text-slate-400 font-mono">{placeholder}</span>
-      </div>
-    </div>
-  );
-}
-
 export function WBtn({
   label,
   primary = false,
@@ -66,27 +55,9 @@ export function WBtn({
   );
 }
 
-export function WTag({ label, active = false }: { label: string; active?: boolean }) {
-  return (
-    <div
-      className={`rounded-full border text-[11px] px-3 py-1.5 font-mono cursor-pointer ${
-        active ? "border-sky-600 bg-sky-600 text-white" : "border-slate-200 bg-white text-slate-700"
-      }`}
-    >
-      {label}
-    </div>
-  );
-}
-
 export function WAnnotation({ text }: { text: string }) {
   return (
     <span className="font-mono text-[9px] text-slate-400 leading-none">{text}</span>
-  );
-}
-
-export function WLabel({ text, className = "" }: { text: string; className?: string }) {
-  return (
-    <p className={`text-[11px] font-mono text-slate-500 ${className}`}>{text}</p>
   );
 }
 
