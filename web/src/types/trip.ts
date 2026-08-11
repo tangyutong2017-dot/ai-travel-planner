@@ -41,19 +41,78 @@ export type TravelersPayload = {
   infants: number;
 };
 
+export type IntercityTransport = "flight" | "train" | "selfDrive" | "mixed";
+export type LocalTransport = "walking" | "transit" | "driving";
+export type TravelParty = "solo" | "couple" | "friends" | "family" | "multigenerational";
+export type ComfortLevel = "budget" | "standard" | "comfort" | "luxury";
+export type ActivityLevel = "low" | "medium" | "high";
+export type TripPace = "packed" | "balanced" | "relaxed";
+export type VisitHistory = "first" | "returning";
+
 export type CreateTripPayload = {
+  originCity: string;
   destination: string;
   startDate: string;
   endDate: string;
   days: number;
+  intercityTransport: IntercityTransport;
   travelers: TravelersPayload;
+  travelParty: TravelParty;
+  visitHistory: VisitHistory;
   preferences: {
     interests: string[];
-    pace: number;
-    transport: string[];
-    accommodation: string[];
+    pace: TripPace;
+    localTransport: LocalTransport[];
+    comfortLevel: ComfortLevel;
+    activityLevel: ActivityLevel;
     customText: string;
   };
+};
+
+/** 枚举值 → 中文标签。表单选项与 LLM prompt 共用同一份，避免两处走样。 */
+export const INTERCITY_TRANSPORT_LABELS: Record<IntercityTransport, string> = {
+  flight: "飞机",
+  train: "高铁 / 火车",
+  selfDrive: "自驾",
+  mixed: "混合",
+};
+
+export const LOCAL_TRANSPORT_LABELS: Record<LocalTransport, string> = {
+  walking: "步行为主",
+  transit: "公共交通",
+  driving: "驾车（自驾·打车·包车）",
+};
+
+export const TRAVEL_PARTY_LABELS: Record<TravelParty, string> = {
+  solo: "单人",
+  couple: "情侣 / 夫妻",
+  friends: "朋友同行",
+  family: "家庭亲子",
+  multigenerational: "多代同游（带老人）",
+};
+
+export const COMFORT_LEVEL_LABELS: Record<ComfortLevel, string> = {
+  budget: "经济",
+  standard: "中等",
+  comfort: "舒适",
+  luxury: "豪华",
+};
+
+export const ACTIVITY_LEVEL_LABELS: Record<ActivityLevel, string> = {
+  low: "轻松为主",
+  medium: "适度活动",
+  high: "能徒步能骑行",
+};
+
+export const TRIP_PACE_LABELS: Record<TripPace, string> = {
+  relaxed: "慢节奏深度游",
+  balanced: "适中",
+  packed: "特种兵打卡",
+};
+
+export const VISIT_HISTORY_LABELS: Record<VisitHistory, string> = {
+  first: "第一次来",
+  returning: "来过，想看点不一样的",
 };
 
 export type CreateTripResponse = {

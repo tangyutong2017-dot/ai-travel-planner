@@ -18,16 +18,12 @@ def make_trip_id(destination: str) -> str:
     return f"trip_{safe_destination or 'new'}_{uuid4().hex[:8]}"
 
 
+PACE_WORDS = {"relaxed": "慢游", "balanced": "精选线", "packed": "深度快线"}
+
+
 def generate_trip_name(payload: CreateTripPayload) -> str:
     interests = payload.preferences.interests or []
-    pace = payload.preferences.pace
-
-    if pace <= 35:
-        pace_word = "慢游"
-    elif pace >= 75:
-        pace_word = "深度快线"
-    else:
-        pace_word = "精选线"
+    pace_word = PACE_WORDS[payload.preferences.pace]
 
     theme_words = []
     for interest in interests:

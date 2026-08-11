@@ -25,20 +25,48 @@ class Travelers(BaseModel):
         return self
 
 
+# 城际交通：怎么来、怎么走，决定首末日的可用时间
+IntercityTransport = Literal["flight", "train", "selfDrive", "mixed"]
+
+# 市内通勤：只保留三种，因为路线计算只有这三种走法。
+# 自驾 / 打车 / 包车在路线计算上完全等价，拆开会让用户在无差别的选项间做选择。
+LocalTransport = Literal["walking", "transit", "driving"]
+
+# 同行关系。人数给精确值，这里给语义——同样 2 个成人，情侣和朋友的行程不同
+TravelParty = Literal["solo", "couple", "friends", "family", "multigenerational"]
+
+# 档次偏好。取代原先的住宿类型：它同时影响餐饮与住宿片区，且不需要任何价格数据源
+ComfortLevel = Literal["budget", "standard", "comfort", "luxury"]
+
+# 体力接受度。带老人或体力弱时，长距离徒步是硬约束而非偏好
+ActivityLevel = Literal["low", "medium", "high"]
+
+# 节奏。原为 1-100 数值，但代码本就压成三档，且已决定交给 LLM 理解语义
+TripPace = Literal["packed", "balanced", "relaxed"]
+
+# 是否来过。二刷需要避开首刷已打卡的热门点
+VisitHistory = Literal["first", "returning"]
+
+
 class TripPreferences(BaseModel):
     interests: list[str]
-    pace: int = Field(ge=1, le=100)
-    transport: list[str]
-    accommodation: list[str]
+    pace: TripPace
+    localTransport: list[LocalTransport]
+    comfortLevel: ComfortLevel
+    activityLevel: ActivityLevel
     customText: str = ""
 
 
 class CreateTripPayload(BaseModel):
+    originCity: str
     destination: str
     startDate: str
     endDate: str
     days: int = Field(ge=1, le=60)
+    intercityTransport: IntercityTransport
     travelers: Travelers
+    travelParty: TravelParty
+    visitHistory: VisitHistory
     preferences: TripPreferences
 
 

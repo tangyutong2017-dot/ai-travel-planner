@@ -33,10 +33,14 @@ check("health 可用", s == 200 and d.get("status") == "ok", f"{s} {d}")
 
 # --- 创建行程 (PRD 8.1) ---
 payload = {
-    "destination": "成都", "startDate": "2026-10-01", "endDate": "2026-10-03", "days": 3,
+    "originCity": "北京", "destination": "成都",
+    "startDate": "2026-10-01", "endDate": "2026-10-03", "days": 3,
+    "intercityTransport": "flight",
     "travelers": {"adults": 2, "children": 0, "infants": 0},
-    "preferences": {"interests": ["美食探索", "文化历史"], "pace": 40,
-                    "transport": ["公共交通"], "accommodation": ["酒店"], "customText": "慢一点"},
+    "travelParty": "couple", "visitHistory": "first",
+    "preferences": {"interests": ["美食探索", "文化历史"], "pace": "relaxed",
+                    "localTransport": ["transit", "walking"], "comfortLevel": "standard",
+                    "activityLevel": "medium", "customText": "不吃辣，想慢一点"},
 }
 s, d = call("POST", "/api/trips", payload)
 trip = d.get("tripId")

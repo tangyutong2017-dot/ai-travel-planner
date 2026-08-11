@@ -2,7 +2,22 @@ import { useState } from "react";
 import { getJobStatus } from "../../api/jobs";
 import { createTrip, startTripGeneration } from "../../api/trips";
 import type { AgentJob } from "../../types/job";
-import type { CreateTripPayload, CreateTripResponse } from "../../types/trip";
+import type {
+  CreateTripPayload,
+  CreateTripResponse,
+  IntercityTransport,
+  LocalTransport,
+  TravelParty,
+} from "../../types/trip";
+import {
+  ACTIVITY_LEVEL_LABELS,
+  COMFORT_LEVEL_LABELS,
+  INTERCITY_TRANSPORT_LABELS,
+  LOCAL_TRANSPORT_LABELS,
+  TRAVEL_PARTY_LABELS,
+  TRIP_PACE_LABELS,
+  VISIT_HISTORY_LABELS,
+} from "../../types/trip";
 import { Divider, SectionTitle, WAnnotation, WBox, WBtn } from "../../components/ui/Primitives";
 
 type WizardStep = "create" | "preferences" | "generating";
@@ -20,8 +35,12 @@ const isoDate = (offsetDays: number) => {
 const DEFAULT_TRIP_DAYS = 5;
 
 const initialForm: WizardForm = {
-  // 目的地必须留空：填了默认值会让用户不知不觉创建一条别人的行程
+  // 出发城市与目的地都必须留空：填了默认值会让用户不知不觉创建一条别人的行程
+  originCity: "",
   destination: "",
+  intercityTransport: "flight",
+  travelParty: "couple",
+  visitHistory: "first",
   startDate: isoDate(7),
   endDate: isoDate(7 + DEFAULT_TRIP_DAYS - 1),
   days: DEFAULT_TRIP_DAYS,
@@ -32,9 +51,10 @@ const initialForm: WizardForm = {
   },
   preferences: {
     interests: ["自然风光", "美食探索", "文化历史"],
-    pace: 50,
-    transport: ["公共交通", "步行为主"],
-    accommodation: ["酒店"],
+    pace: "balanced",
+    localTransport: ["transit", "walking"],
+    comfortLevel: "standard",
+    activityLevel: "medium",
     customText: "",
   },
 };
@@ -152,6 +172,7 @@ export function WizardOverlay({ onClose, onDone }: { onClose: () => void; onDone
         {step === "preferences" && (
           <PagePreferences
             form={form}
+            onPatchForm={patchForm}
             onPatchPreferences={patchPreferences}
             onBack={() => setStep("create")}
             onNext={handleSubmit}
@@ -268,7 +289,7 @@ function PageCreate({
   onNext: () => void;
 }) {
   const days = calculateDays(form.startDate, form.endDate);
-  const canContinue = form.destination.trim().length > 0 && days > 0;
+  const canContinue = form.originCity.trim().length > 0 && form.destination.trim().length > 0 && days > 0;
 
   const updateTraveler = (key: keyof WizardForm["travelers"], delta: number) => {
     onPatchTravelers({ [key]: Math.max(0, form.travelers[key] + delta) });
@@ -286,15 +307,39 @@ function PageCreate({
           <StepIndicator activeIndex={0} />
 
           <WBox className="p-5">
-            <SectionTitle text="目的地" />
-            <div className="mb-4">
+            <SectionTitle text="出发与目的地" />
+            <div className="grid grid-cols-2 gap-3 mb-4">
               <Field
-                label="搜索目的地城市或国家"
+                label="出发城市"
+                value={form.originCity}
+                placeholder="例如：北京"
+                onChange={(originCity) => onPatchForm({ originCity })}
+              />
+              <Field
+                label="目的地城市或国家"
                 value={form.destination}
-                placeholder="例如：云南大理 / 四川成都"
+                placeholder="例如：云南大理"
                 onChange={(destination) => onPatchForm({ destination })}
               />
             </div>
+
+            <SectionTitle text="城际交通方式" />
+            <div className="flex flex-wrap gap-2 mb-4">
+              {(Object.entries(INTERCITY_TRANSPORT_LABELS) as [IntercityTransport, string][]).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => onPatchForm({ intercityTransport: key })}
+                  className={`border text-xs px-3 py-1.5 font-mono cursor-pointer transition-colors ${
+                    form.intercityTransport === key
+                      ? "border-gray-900 bg-gray-900 text-white"
+                      : "border-gray-400 bg-white text-gray-700 hover:border-gray-600"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="-mt-2 mb-4 text-[10px] font-mono text-slate-400">决定首日几点能开始玩、末日几点必须收工</p>
 
             <SectionTitle text="行程时间" />
             <div className="grid grid-cols-3 gap-3 mb-4">
@@ -351,9 +396,26 @@ function PageCreate({
               })}
             </div>
 
+            <SectionTitle text="同行关系" />
+            <div className="flex flex-wrap gap-2 mb-4">
+              {(Object.entries(TRAVEL_PARTY_LABELS) as [TravelParty, string][]).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => onPatchForm({ travelParty: key })}
+                  className={`border text-xs px-3 py-1.5 font-mono cursor-pointer transition-colors ${
+                    form.travelParty === key
+                      ? "border-gray-900 bg-gray-900 text-white"
+                      : "border-gray-400 bg-white text-gray-700 hover:border-gray-600"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
             <Divider className="mb-4" />
             <div className="flex justify-between items-center">
-              <WAnnotation text={canContinue ? "基本信息已可提交" : "请填写目的地和有效日期"} />
+              <WAnnotation text={canContinue ? "基本信息已可提交" : "请填写出发城市、目的地和有效日期"} />
               <button
                 onClick={onNext}
                 disabled={!canContinue}
@@ -370,6 +432,43 @@ function PageCreate({
         </div>
       </div>
     </div>
+  );
+}
+
+/** 单选。用于枚举型偏好——选项互斥，不该用多选的 TagGroup。 */
+function ChoiceGroup<T extends string>({
+  title,
+  labels,
+  value,
+  onChange,
+  hint,
+}: {
+  title: string;
+  labels: Record<T, string>;
+  value: T;
+  onChange: (next: T) => void;
+  hint?: string;
+}) {
+  return (
+    <WBox className="p-4">
+      <SectionTitle text={title} />
+      <div className="flex flex-wrap gap-2">
+        {(Object.entries(labels) as [T, string][]).map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => onChange(key)}
+            className={`border text-xs px-3 py-1.5 font-mono cursor-pointer transition-colors ${
+              value === key
+                ? "border-gray-900 bg-gray-900 text-white"
+                : "border-gray-400 bg-white text-gray-700 hover:border-gray-600"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {hint && <p className="mt-2 text-[10px] font-mono text-slate-400">{hint}</p>}
+    </WBox>
   );
 }
 
@@ -485,11 +584,13 @@ function TagGroup({
 
 function PagePreferences({
   form,
+  onPatchForm,
   onPatchPreferences,
   onNext,
   onBack,
 }: {
   form: WizardForm;
+  onPatchForm: (patch: Partial<WizardForm>) => void;
   onPatchPreferences: (patch: Partial<WizardForm["preferences"]>) => void;
   onNext: () => void;
   onBack: () => void;
@@ -524,57 +625,71 @@ function PagePreferences({
               onChange={(interests) => onPatchPreferences({ interests })}
             />
 
+            <ChoiceGroup
+              title="行程节奏"
+              labels={TRIP_PACE_LABELS}
+              value={form.preferences.pace}
+              onChange={(pace) => onPatchPreferences({ pace })}
+              hint="不强制每天安排几个景点——AI 会结合景点本身的耗时判断"
+            />
+
             <WBox className="p-4">
-              <SectionTitle text="行程节奏" />
-              <div className="relative mb-3">
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={form.preferences.pace}
-                  onChange={(event) => onPatchPreferences({ pace: Number(event.target.value) })}
-                  className="w-full accent-gray-800"
-                />
-              </div>
-              <div className="flex justify-between text-xs font-mono text-gray-500">
-                <span>
-                  轻松悠闲
-                  <br />
-                  <span className="text-[10px] text-gray-400">每天 1-2 个景点</span>
-                </span>
-                <span className="text-center">
-                  适中
-                  <br />
-                  <span className="text-[10px] text-gray-400">每天 3-4 个景点</span>
-                </span>
-                <span className="text-right">
-                  紧凑高效
-                  <br />
-                  <span className="text-[10px] text-gray-400">每天 5+ 个景点</span>
-                </span>
+              <SectionTitle text="目的地内的通勤方式（可多选）" />
+              <div className="flex flex-wrap gap-2">
+                {(Object.entries(LOCAL_TRANSPORT_LABELS) as [LocalTransport, string][]).map(([key, label]) => {
+                  const active = form.preferences.localTransport.includes(key);
+                  return (
+                    <button
+                      key={key}
+                      onClick={() =>
+                        onPatchPreferences({
+                          localTransport: active
+                            ? form.preferences.localTransport.filter((item) => item !== key)
+                            : [...form.preferences.localTransport, key],
+                        })
+                      }
+                      className={`border text-xs px-3 py-1.5 font-mono cursor-pointer transition-colors ${
+                        active
+                          ? "border-gray-900 bg-gray-900 text-white"
+                          : "border-gray-400 bg-white text-gray-700 hover:border-gray-600"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
               </div>
             </WBox>
 
-            <TagGroup
-              title="交通偏好"
-              preset={["公共交通", "自驾", "出租车 / 网约车", "步行为主", "包车"]}
-              selected={form.preferences.transport}
-              onChange={(transport) => onPatchPreferences({ transport })}
+            <ChoiceGroup
+              title="档次偏好"
+              labels={COMFORT_LEVEL_LABELS}
+              value={form.preferences.comfortLevel}
+              onChange={(comfortLevel) => onPatchPreferences({ comfortLevel })}
+              hint="影响餐饮与住宿片区的推荐取向"
             />
 
-            <TagGroup
-              title="住宿类型偏好"
-              preset={["酒店", "民宿", "青旅", "度假村", "精品酒店"]}
-              selected={form.preferences.accommodation}
-              onChange={(accommodation) => onPatchPreferences({ accommodation })}
+            <ChoiceGroup
+              title="体力活动接受度"
+              labels={ACTIVITY_LEVEL_LABELS}
+              value={form.preferences.activityLevel}
+              onChange={(activityLevel) => onPatchPreferences({ activityLevel })}
+              hint="带老人小孩或体力有限时，长距离徒步会被排除"
+            />
+
+            <ChoiceGroup
+              title="是否来过这里"
+              labels={VISIT_HISTORY_LABELS}
+              value={form.visitHistory}
+              onChange={(visitHistory) => onPatchForm({ visitHistory })}
             />
 
             <WBox className="p-4">
-              <SectionTitle text="其他自定义偏好（可选）" />
+              <SectionTitle text="还有什么要告诉 AI 的（可选）" />
               <textarea
                 value={form.preferences.customText}
                 onChange={(event) => onPatchPreferences({ customText: event.target.value })}
-                placeholder="例如：我有老人同行，希望行程不要太赶；对海鲜过敏；希望多安排购物时间……"
+                placeholder="越具体越好，例如：不吃辣；爸妈膝盖不好，爬不了长台阶；纪念日想安排一顿有仪式感的晚餐；不想去人挤人的网红点；一定要去洱海看日落"
                 className="border border-gray-300 bg-gray-50 h-20 p-3 w-full text-xs text-gray-700 font-mono outline-none focus:border-gray-900 focus:bg-white resize-none"
               />
             </WBox>
@@ -611,7 +726,15 @@ function PageGenerating({
     4,
     Math.min(100, job?.progress ?? (state === "submitting" ? 12 : state === "error" ? 38 : 8)),
   );
-  const summary = `${form.destination} · ${form.days}天 · 成人 ${form.travelers.adults} 人 · ${form.preferences.interests.slice(0, 2).join(" / ")}`;
+  const summary = [
+    `${form.originCity} → ${form.destination}`,
+    `${form.days} 天`,
+    `${TRAVEL_PARTY_LABELS[form.travelParty]} ${form.travelers.adults + form.travelers.children + form.travelers.infants} 人`,
+    TRIP_PACE_LABELS[form.preferences.pace],
+    form.preferences.interests.slice(0, 2).join(" / "),
+  ]
+    .filter(Boolean)
+    .join(" · ");
   const title = state === "succeeded" ? "行程已生成" : state === "error" ? "生成遇到一点问题" : "正在生成你的行程";
   const currentMessage =
     state === "succeeded"

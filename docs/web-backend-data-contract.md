@@ -124,16 +124,21 @@ type CreateTripPayload = {
   startDate: string
   endDate: string
   days: number
+  originCity: string
+  intercityTransport: 'flight' | 'train' | 'selfDrive' | 'mixed'
   travelers: {
     adults: number
     children: number
     infants: number
   }
+  travelParty: 'solo' | 'couple' | 'friends' | 'family' | 'multigenerational'
+  visitHistory: 'first' | 'returning'
   preferences: {
     interests: string[]
-    pace: number
-    transport: string[]
-    accommodation: string[]
+    pace: 'packed' | 'balanced' | 'relaxed'
+    localTransport: ('walking' | 'transit' | 'driving')[]
+    comfortLevel: 'budget' | 'standard' | 'comfort' | 'luxury'
+    activityLevel: 'low' | 'medium' | 'high'
     customText: string
   }
 }
@@ -192,3 +197,31 @@ type AgentJob = {
 
 保留的是**单个景点的真实门票价**（`ItineraryItem.cost`，来自高德），
 在景点卡片上如实展示"免费 / ¥80"，但不做任何加总与超支校验。
+
+
+## 输入层改版（2026-08-11）
+
+### 新增
+
+| 字段 | 为什么需要 |
+|---|---|
+| `originCity` | 没有出发地就无法推算首日几点能开始玩、末日几点必须收工 |
+| `intercityTransport` | 飞机与高铁的到达时间差异显著，直接影响首末日可用时长 |
+| `travelParty` | 人数给精确值，关系给语义——同样 2 个成人，情侣与朋友的行程不同 |
+| `visitHistory` | 二刷需要避开首刷已打卡的热门点 |
+| `preferences.comfortLevel` | 定性档次，不需要价格数据源即可影响餐饮与住宿片区取向 |
+| `preferences.activityLevel` | 带老人或体力受限时，长距离徒步是**硬约束**而非偏好，属安全范畴 |
+
+### 修改
+
+- `preferences.pace`：`1..100` 数值 → `'packed' | 'balanced' | 'relaxed'` 枚举。
+  原数值精度是假的（代码本就压成三档），且节奏语义交由 LLM 理解，标签比数字信息量大。
+- `preferences.transport` → `preferences.localTransport`，并由 5 个选项收敛为 3 个。
+  改名是为了与新增的城际交通区分；收敛是因为自驾 / 打车 / 包车在路线计算上完全等价，
+  让用户在不产生任何差异的选项间做选择是种伪装。若将来要建模停车，可再拆开。
+
+### 删除
+
+- `preferences.accommodation`（酒店/民宿/青旅/度假村/精品酒店）：全后端零引用。
+  产品只输出「建议住宿片区」而不推荐具体酒店，住宿类型不改变任何输出，
+  其意图已由 `comfortLevel` 覆盖。
