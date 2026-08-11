@@ -57,13 +57,7 @@ const calculateDays = (startDate: string, endDate: string) => {
 
 const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
-export function WizardOverlay({
-  onClose,
-  onDone,
-}: {
-  onClose: () => void;
-  onDone: (tripId: string) => void;
-}) {
+export function WizardOverlay({ onClose, onDone }: { onClose: () => void; onDone: (tripId: string) => void }) {
   const [step, setStep] = useState<WizardStep>("create");
   const [form, setForm] = useState<WizardForm>(initialForm);
   const [submitState, setSubmitState] = useState<"idle" | "submitting" | "polling" | "succeeded" | "error">("idle");
@@ -209,11 +203,15 @@ function StepPills({ current }: { current: WizardStep }) {
 
         return (
           <div key={step} className="flex items-center">
-            <div className={`flex items-center gap-1.5 px-2.5 py-1 border text-[11px] font-mono ${
-              isCurrent ? "border-sky-600 bg-sky-600 text-white shadow-sm shadow-sky-200"
-              : isDone ? "border-sky-200 bg-sky-50 text-sky-700"
-              : "border-slate-200 bg-white text-slate-400"
-            }`}>
+            <div
+              className={`flex items-center gap-1.5 px-2.5 py-1 border text-[11px] font-mono ${
+                isCurrent
+                  ? "border-sky-600 bg-sky-600 text-white shadow-sm shadow-sky-200"
+                  : isDone
+                    ? "border-sky-200 bg-sky-50 text-sky-700"
+                    : "border-slate-200 bg-white text-slate-400"
+              }`}
+            >
               <span className="font-bold">{i + 1}</span>
               <span>{labels[i]}</span>
               {isDone && <span className="text-sky-600">✓</span>}
@@ -319,8 +317,18 @@ function PageCreate({
 
             <SectionTitle text="行程时间" />
             <div className="grid grid-cols-3 gap-3 mb-4">
-              <Field label="出发日期" type="date" value={form.startDate} onChange={(startDate) => onPatchForm({ startDate })} />
-              <Field label="返回日期" type="date" value={form.endDate} onChange={(endDate) => onPatchForm({ endDate })} />
+              <Field
+                label="出发日期"
+                type="date"
+                value={form.startDate}
+                onChange={(startDate) => onPatchForm({ startDate })}
+              />
+              <Field
+                label="返回日期"
+                type="date"
+                value={form.endDate}
+                onChange={(endDate) => onPatchForm({ endDate })}
+              />
               <div className="flex flex-col gap-1">
                 <span className="text-xs font-medium text-slate-600">行程天数</span>
                 <div className="rounded-md border border-slate-200 bg-slate-50 h-9 px-3 flex items-center justify-between">
@@ -343,9 +351,19 @@ function PageCreate({
                     <p className="text-xs font-medium text-slate-700">{group.label}</p>
                     <p className="text-[10px] text-slate-400 font-mono mb-2">{group.sub}</p>
                     <div className="flex items-center gap-2">
-                      <button onClick={() => updateTraveler(key, -1)} className="w-7 h-7 rounded-md border border-slate-200 bg-white flex items-center justify-center text-sm font-mono hover:bg-sky-50">-</button>
+                      <button
+                        onClick={() => updateTraveler(key, -1)}
+                        className="w-7 h-7 rounded-md border border-slate-200 bg-white flex items-center justify-center text-sm font-mono hover:bg-sky-50"
+                      >
+                        -
+                      </button>
                       <span className="text-base font-bold w-6 text-center">{form.travelers[key]}</span>
-                      <button onClick={() => updateTraveler(key, 1)} className="w-7 h-7 rounded-md border border-slate-200 bg-white flex items-center justify-center text-sm font-mono hover:bg-sky-50">+</button>
+                      <button
+                        onClick={() => updateTraveler(key, 1)}
+                        className="w-7 h-7 rounded-md border border-slate-200 bg-white flex items-center justify-center text-sm font-mono hover:bg-sky-50"
+                      >
+                        +
+                      </button>
                     </div>
                   </div>
                 );
@@ -354,8 +372,18 @@ function PageCreate({
 
             <SectionTitle text="预算范围（可选）" />
             <div className="grid grid-cols-2 gap-3 mb-4">
-              <Field label="最低预算（元）" type="number" value={form.budget.min} onChange={(min) => onPatchBudget({ min: Number(min) })} />
-              <Field label="最高预算（元）" type="number" value={form.budget.max} onChange={(max) => onPatchBudget({ max: Number(max) })} />
+              <Field
+                label="最低预算（元）"
+                type="number"
+                value={form.budget.min}
+                onChange={(min) => onPatchBudget({ min: Number(min) })}
+              />
+              <Field
+                label="最高预算（元）"
+                type="number"
+                value={form.budget.max}
+                onChange={(max) => onPatchBudget({ max: Number(max) })}
+              />
             </div>
 
             <Divider className="mb-4" />
@@ -365,7 +393,9 @@ function PageCreate({
                 onClick={onNext}
                 disabled={!canContinue}
                 className={`border font-medium font-mono text-sm px-5 py-2 ${
-                  canContinue ? "rounded-md bg-sky-600 text-white border-sky-600 cursor-pointer hover:bg-sky-700" : "rounded-md bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                  canContinue
+                    ? "rounded-md bg-sky-600 text-white border-sky-600 cursor-pointer hover:bg-sky-700"
+                    : "rounded-md bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
                 }`}
               >
                 下一步：偏好设置 →
@@ -458,10 +488,19 @@ function TagGroup({
               placeholder="输入后回车确认"
               className="border border-gray-500 bg-white text-xs font-mono px-2 py-1.5 w-32 outline-none focus:border-gray-900"
             />
-            <button onClick={addCustom} className="border border-l-0 border-gray-500 bg-gray-900 text-white text-xs font-mono px-2 py-1.5 cursor-pointer hover:bg-gray-700">
+            <button
+              onClick={addCustom}
+              className="border border-l-0 border-gray-500 bg-gray-900 text-white text-xs font-mono px-2 py-1.5 cursor-pointer hover:bg-gray-700"
+            >
               确认
             </button>
-            <button onClick={() => { setEditing(false); setInputVal(""); }} className="border border-l-0 border-gray-400 bg-white text-gray-500 text-xs font-mono px-2 py-1.5 cursor-pointer hover:bg-gray-50">
+            <button
+              onClick={() => {
+                setEditing(false);
+                setInputVal("");
+              }}
+              className="border border-l-0 border-gray-400 bg-white text-gray-500 text-xs font-mono px-2 py-1.5 cursor-pointer hover:bg-gray-50"
+            >
               取消
             </button>
           </div>
@@ -504,7 +543,18 @@ function PagePreferences({
           <div className="space-y-3">
             <TagGroup
               title="兴趣偏好（可多选）"
-              preset={["文化历史", "美食探索", "自然风光", "购物血拼", "户外冒险", "主题乐园", "艺术展览", "夜生活", "温泉休闲", "本地市场"]}
+              preset={[
+                "文化历史",
+                "美食探索",
+                "自然风光",
+                "购物血拼",
+                "户外冒险",
+                "主题乐园",
+                "艺术展览",
+                "夜生活",
+                "温泉休闲",
+                "本地市场",
+              ]}
               selected={form.preferences.interests}
               onChange={(interests) => onPatchPreferences({ interests })}
             />
@@ -522,9 +572,21 @@ function PagePreferences({
                 />
               </div>
               <div className="flex justify-between text-xs font-mono text-gray-500">
-                <span>轻松悠闲<br /><span className="text-[10px] text-gray-400">每天 1-2 个景点</span></span>
-                <span className="text-center">适中<br /><span className="text-[10px] text-gray-400">每天 3-4 个景点</span></span>
-                <span className="text-right">紧凑高效<br /><span className="text-[10px] text-gray-400">每天 5+ 个景点</span></span>
+                <span>
+                  轻松悠闲
+                  <br />
+                  <span className="text-[10px] text-gray-400">每天 1-2 个景点</span>
+                </span>
+                <span className="text-center">
+                  适中
+                  <br />
+                  <span className="text-[10px] text-gray-400">每天 3-4 个景点</span>
+                </span>
+                <span className="text-right">
+                  紧凑高效
+                  <br />
+                  <span className="text-[10px] text-gray-400">每天 5+ 个景点</span>
+                </span>
               </div>
             </WBox>
 
@@ -580,16 +642,18 @@ function PageGenerating({
   onRetry: () => void;
   onDone: (tripId: string) => void;
 }) {
-  const progress = Math.max(4, Math.min(100, job?.progress ?? (state === "submitting" ? 12 : state === "error" ? 38 : 8)));
+  const progress = Math.max(
+    4,
+    Math.min(100, job?.progress ?? (state === "submitting" ? 12 : state === "error" ? 38 : 8)),
+  );
   const summary = `${form.destination} · ${form.days}天 · 成人 ${form.travelers.adults} 人 · ${form.preferences.interests.slice(0, 2).join(" / ")}`;
-  const title =
-    state === "succeeded" ? "行程已生成" :
-    state === "error" ? "生成遇到一点问题" :
-    "正在生成你的行程";
+  const title = state === "succeeded" ? "行程已生成" : state === "error" ? "生成遇到一点问题" : "正在生成你的行程";
   const currentMessage =
-    state === "succeeded" ? "已整理好每日安排、景点信息和路线摘要" :
-    state === "error" ? error || "本次生成没有完成，可以重新提交" :
-    job?.message ?? (state === "submitting" ? "正在保存旅行需求" : "正在理解偏好并生成候选安排");
+    state === "succeeded"
+      ? "已整理好每日安排、景点信息和路线摘要"
+      : state === "error"
+        ? error || "本次生成没有完成，可以重新提交"
+        : (job?.message ?? (state === "submitting" ? "正在保存旅行需求" : "正在理解偏好并生成候选安排"));
   const steps = [
     { label: "保存旅行需求", threshold: 10 },
     { label: "理解偏好与节奏", threshold: 28 },
@@ -598,7 +662,8 @@ function PageGenerating({
     { label: "整理每日行程", threshold: 96 },
   ];
   const nextStepIndex = steps.findIndex((stepItem) => progress < stepItem.threshold);
-  const activeIndex = state === "succeeded" ? steps.length : Math.max(0, nextStepIndex === -1 ? steps.length - 1 : nextStepIndex);
+  const activeIndex =
+    state === "succeeded" ? steps.length : Math.max(0, nextStepIndex === -1 ? steps.length - 1 : nextStepIndex);
 
   return (
     <div className="flex-1 overflow-auto bg-[radial-gradient(circle_at_top,#e0f2fe_0,#f8fafc_34%,#f8fafc_100%)] flex items-center justify-center px-6 py-8">
@@ -606,14 +671,24 @@ function PageGenerating({
         <WBox className="p-8 sm:p-10">
           <div className="mb-8 flex items-start justify-between gap-6">
             <div>
-              <div className={`mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-medium ${
-                state === "succeeded" ? "border-emerald-200 bg-emerald-50 text-emerald-700" :
-                state === "error" ? "border-rose-200 bg-rose-50 text-rose-700" :
-                "border-sky-200 bg-sky-50 text-sky-700"
-              }`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${
-                  state === "succeeded" ? "bg-emerald-500" : state === "error" ? "bg-rose-500" : "bg-sky-500 animate-pulse"
-                }`} />
+              <div
+                className={`mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-medium ${
+                  state === "succeeded"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : state === "error"
+                      ? "border-rose-200 bg-rose-50 text-rose-700"
+                      : "border-sky-200 bg-sky-50 text-sky-700"
+                }`}
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    state === "succeeded"
+                      ? "bg-emerald-500"
+                      : state === "error"
+                        ? "bg-rose-500"
+                        : "bg-sky-500 animate-pulse"
+                  }`}
+                />
                 {state === "succeeded" ? "规划完成" : state === "error" ? "需要重试" : "智能规划中"}
               </div>
               <h2 className="text-2xl font-bold text-slate-950 mb-2">{title}</h2>
@@ -622,7 +697,9 @@ function PageGenerating({
             <div className="hidden sm:flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border border-sky-100 bg-white shadow-sm shadow-sky-100">
               <div className="relative h-10 w-10">
                 <div className="absolute inset-0 rounded-full border-2 border-sky-100" />
-                <div className={`absolute inset-0 rounded-full border-2 border-sky-500 border-t-transparent ${state === "polling" || state === "submitting" ? "animate-spin" : ""}`} />
+                <div
+                  className={`absolute inset-0 rounded-full border-2 border-sky-500 border-t-transparent ${state === "polling" || state === "submitting" ? "animate-spin" : ""}`}
+                />
                 <div className="absolute inset-3 rounded-full bg-sky-500/15" />
               </div>
             </div>
@@ -653,18 +730,26 @@ function PageGenerating({
                 <div
                   key={stepItem.label}
                   className={`rounded-lg border p-3 transition-colors ${
-                    done ? "border-emerald-100 bg-emerald-50/70 text-emerald-700" :
-                    failed ? "border-rose-100 bg-rose-50 text-rose-700" :
-                    active ? "border-sky-200 bg-sky-50 text-sky-800" :
-                    "border-slate-100 bg-slate-50 text-slate-400"
+                    done
+                      ? "border-emerald-100 bg-emerald-50/70 text-emerald-700"
+                      : failed
+                        ? "border-rose-100 bg-rose-50 text-rose-700"
+                        : active
+                          ? "border-sky-200 bg-sky-50 text-sky-800"
+                          : "border-slate-100 bg-slate-50 text-slate-400"
                   }`}
                 >
-                  <div className={`mb-2 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
-                    done ? "bg-emerald-500 text-white" :
-                    failed ? "bg-rose-500 text-white" :
-                    active ? "bg-sky-600 text-white" :
-                    "bg-slate-200 text-slate-500"
-                  }`}>
+                  <div
+                    className={`mb-2 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
+                      done
+                        ? "bg-emerald-500 text-white"
+                        : failed
+                          ? "bg-rose-500 text-white"
+                          : active
+                            ? "bg-sky-600 text-white"
+                            : "bg-slate-200 text-slate-500"
+                    }`}
+                  >
                     {done ? "✓" : failed ? "!" : index + 1}
                   </div>
                   <p className="text-xs font-medium leading-snug">{stepItem.label}</p>

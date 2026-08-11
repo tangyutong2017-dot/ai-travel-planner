@@ -9,10 +9,7 @@ import { getTrips } from "./api/trips";
 import type { Trip } from "./types/trip";
 
 type Route =
-  | { page: "trips" }
-  | { page: "newTrip" }
-  | { page: "workspace"; tripId: string }
-  | { page: "output"; tripId: string };
+  { page: "trips" } | { page: "newTrip" } | { page: "workspace"; tripId: string } | { page: "output"; tripId: string };
 
 const FALLBACK_RECENT_TRIPS: Trip[] = [];
 
@@ -69,7 +66,9 @@ export default function App() {
   const [selectedAttraction, setSelectedAttraction] = useState<ItineraryItem | null>(null);
   const [recentTrips, setRecentTrips] = useState<Trip[]>(FALLBACK_RECENT_TRIPS);
   const [recentReloadKey, setRecentReloadKey] = useState(0);
-  const [lastWorkspaceTripId, setLastWorkspaceTripId] = useState(() => window.localStorage.getItem("travel-planner:last-workspace-trip") ?? "");
+  const [lastWorkspaceTripId, setLastWorkspaceTripId] = useState(
+    () => window.localStorage.getItem("travel-planner:last-workspace-trip") ?? "",
+  );
 
   useEffect(() => {
     if (window.location.pathname === "/") {
@@ -116,10 +115,7 @@ export default function App() {
     return pickDefaultWorkspaceTripId(recentTrips, lastWorkspaceTripId);
   }, [lastWorkspaceTripId, recentTrips, route]);
 
-  const activeTrip = useMemo(
-    () => recentTrips.find((trip) => trip.id === activeTripId),
-    [activeTripId, recentTrips],
-  );
+  const activeTrip = useMemo(() => recentTrips.find((trip) => trip.id === activeTripId), [activeTripId, recentTrips]);
 
   const topNavTitle = useMemo(() => {
     if (route.page === "trips") return "我的行程";
@@ -208,9 +204,7 @@ export default function App() {
             <ModalAttraction item={selectedAttraction} onClose={() => setSelectedAttraction(null)} />
           )}
 
-          {route.page === "newTrip" && (
-            <WizardOverlay onClose={closeWizard} onDone={finishWizard} />
-          )}
+          {route.page === "newTrip" && <WizardOverlay onClose={closeWizard} onDone={finishWizard} />}
         </div>
       </div>
     </div>

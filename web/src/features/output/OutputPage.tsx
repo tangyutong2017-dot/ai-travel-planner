@@ -35,9 +35,7 @@ function PrintPage({
         className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 select-none"
         style={{ transform: "rotate(-30deg)" }}
       >
-        <span className="text-5xl font-bold text-slate-200 tracking-widest opacity-50 whitespace-nowrap">
-          预览版本
-        </span>
+        <span className="text-5xl font-bold text-slate-200 tracking-widest opacity-50 whitespace-nowrap">预览版本</span>
       </div>
 
       <div
@@ -48,16 +46,16 @@ function PrintPage({
           <span className="text-xs font-mono font-bold tracking-widest text-slate-900 uppercase">
             {itinerary.title}
           </span>
-          <span className="text-xs font-mono text-slate-400">
-            AI 行程规划 · 仅供参考
-          </span>
+          <span className="text-xs font-mono text-slate-400">AI 行程规划 · 仅供参考</span>
         </div>
 
         <div className="px-10 py-8">{children}</div>
 
         <div className="absolute bottom-0 left-0 right-0 border-t border-slate-200 px-10 py-2 flex items-center justify-between bg-white">
           <span className="text-[10px] font-mono text-slate-400">由 AI 行程规划生成</span>
-          <span className="text-[10px] font-mono text-slate-400">{pageNum} / {total}</span>
+          <span className="text-[10px] font-mono text-slate-400">
+            {pageNum} / {total}
+          </span>
         </div>
       </div>
 
@@ -79,15 +77,18 @@ function CoverPage({ itinerary, totalPages }: { itinerary: Itinerary; totalPages
     <PrintPage itinerary={itinerary} pageNum={1} total={totalPages}>
       <div className="text-center mb-8">
         <WImgBox className="w-full h-40 mb-6 rounded-lg" label={`封面 · ${itinerary.destination}`} />
-        <h1 className="text-3xl font-bold text-slate-950 mb-2 leading-tight">
-          {itinerary.title}
-        </h1>
+        <h1 className="text-3xl font-bold text-slate-950 mb-2 leading-tight">{itinerary.title}</h1>
         <p className="text-sm font-mono text-slate-500 mb-5">
           {itinerary.dateRange} · 成人 {itinerary.travelers} 人 · 预算约 ¥{grandTotal}
         </p>
         <div className="flex justify-center gap-3 mb-8">
           {itinerary.interests.map((tag) => (
-            <span key={tag} className="text-xs border border-sky-200 bg-sky-50 px-3 py-1 font-mono text-sky-700 rounded-full">{tag}</span>
+            <span
+              key={tag}
+              className="text-xs border border-sky-200 bg-sky-50 px-3 py-1 font-mono text-sky-700 rounded-full"
+            >
+              {tag}
+            </span>
           ))}
         </div>
       </div>
@@ -139,7 +140,9 @@ function DayOutputPage({
         <div>
           <p className="text-[11px] font-mono text-slate-400 uppercase tracking-widest mb-1">DAY {day.day}</p>
           <h2 className="text-2xl font-bold text-slate-950 leading-tight">{day.title}</h2>
-          <p className="text-sm font-mono text-slate-500 mt-1">{day.date} · {itinerary.destination}</p>
+          <p className="text-sm font-mono text-slate-500 mt-1">
+            {day.date} · {itinerary.destination}
+          </p>
         </div>
         <div className="text-right">
           <div className="text-3xl mb-1">{day.weather.icon}</div>
@@ -165,12 +168,16 @@ function DayOutputPage({
                   <div>
                     <p className="text-sm font-semibold text-slate-900">{item.title}</p>
                     <div className="flex items-center gap-3 mt-0.5 text-[11px] font-mono text-slate-500">
-                      <span>{item.startTime}-{item.endTime}</span>
+                      <span>
+                        {item.startTime}-{item.endTime}
+                      </span>
                       <span>· 约 {item.durationLabel}</span>
                       <span>· {item.cost === 0 ? "免费" : `¥ ${item.cost}`}</span>
                     </div>
                   </div>
-                  <span className="text-[10px] font-mono border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-sky-700 shrink-0 rounded-full">{item.type}</span>
+                  <span className="text-[10px] font-mono border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-sky-700 shrink-0 rounded-full">
+                    {item.type}
+                  </span>
                 </div>
               </div>
             </div>
@@ -191,7 +198,8 @@ function DayOutputPage({
                 ["公共交通", `${day.route.transitKm} km`],
               ].map(([key, value]) => (
                 <div key={key} className="flex justify-between text-[10px] font-mono text-slate-500">
-                  <span>{key}</span><span className="font-medium">{value}</span>
+                  <span>{key}</span>
+                  <span className="font-medium">{value}</span>
                 </div>
               ))}
             </div>
@@ -199,7 +207,9 @@ function DayOutputPage({
 
           <div>
             <p className="text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-2">天气详情</p>
-            <p className="text-[10px] font-mono text-slate-500 leading-relaxed">{day.weather.tip ?? "天气适宜，注意合理安排体力。"}</p>
+            <p className="text-[10px] font-mono text-slate-500 leading-relaxed">
+              {day.weather.tip ?? "天气适宜，注意合理安排体力。"}
+            </p>
           </div>
 
           <div>
@@ -207,15 +217,20 @@ function DayOutputPage({
             {Object.entries(day.budget).map(([key, value]) => (
               <div key={key} className="mb-1">
                 <div className="flex justify-between text-[10px] font-mono text-slate-600 mb-0.5">
-                  <span>{key}</span><span>¥ {value}</span>
+                  <span>{key}</span>
+                  <span>¥ {value}</span>
                 </div>
                 <div className="h-1.5 rounded-full bg-slate-100">
-                  <div className="h-full rounded-full bg-sky-500" style={{ width: `${Math.round((value / dayTotal) * 100)}%` }} />
+                  <div
+                    className="h-full rounded-full bg-sky-500"
+                    style={{ width: `${Math.round((value / dayTotal) * 100)}%` }}
+                  />
                 </div>
               </div>
             ))}
             <div className="flex justify-between text-[11px] font-mono font-bold text-slate-800 mt-1.5 pt-1.5 border-t border-slate-300">
-              <span>合计</span><span>¥ {dayTotal}</span>
+              <span>合计</span>
+              <span>¥ {dayTotal}</span>
             </div>
           </div>
         </div>
@@ -238,7 +253,9 @@ function BudgetPage({ itinerary, pageNum, totalPages }: { itinerary: Itinerary; 
         <thead>
           <tr className="border-b-2 border-slate-900">
             {["类别", "金额（¥）", "占比", "备注"].map((header) => (
-              <th key={header} className="py-2 px-3 text-left text-xs text-slate-700 font-bold">{header}</th>
+              <th key={header} className="py-2 px-3 text-left text-xs text-slate-700 font-bold">
+                {header}
+              </th>
             ))}
           </tr>
         </thead>
@@ -247,7 +264,9 @@ function BudgetPage({ itinerary, pageNum, totalPages }: { itinerary: Itinerary; 
             <tr key={key} className={index % 2 === 0 ? "bg-slate-50" : "bg-white"}>
               <td className="py-2.5 px-3 text-sm text-slate-700 border-b border-slate-100">{key}</td>
               <td className="py-2.5 px-3 text-sm text-slate-700 border-b border-slate-100">{value}</td>
-              <td className="py-2.5 px-3 text-sm text-slate-700 border-b border-slate-100">{Math.round((value / grandTotal) * 100)}%</td>
+              <td className="py-2.5 px-3 text-sm text-slate-700 border-b border-slate-100">
+                {Math.round((value / grandTotal) * 100)}%
+              </td>
               <td className="py-2.5 px-3 text-sm text-slate-400 border-b border-slate-100">按每日预算汇总</td>
             </tr>
           ))}
@@ -259,9 +278,7 @@ function BudgetPage({ itinerary, pageNum, totalPages }: { itinerary: Itinerary; 
           </tr>
         </tbody>
       </table>
-      <p className="text-center text-[10px] font-mono text-slate-400">
-        以上费用仅供参考，实际价格以当地为准
-      </p>
+      <p className="text-center text-[10px] font-mono text-slate-400">以上费用仅供参考，实际价格以当地为准</p>
     </PrintPage>
   );
 }
@@ -359,7 +376,9 @@ export function PageOutput({ tripId, onBack }: { tripId: string; onBack: () => v
               key={page.id}
               onClick={() => setActivePage(page.id)}
               className={`w-full text-left px-3 py-2.5 text-xs font-mono border-b border-slate-100 cursor-pointer transition-colors ${
-                activePage === page.id ? "bg-sky-50 text-sky-700 border-r-2 border-sky-500" : "text-slate-600 hover:bg-slate-50"
+                activePage === page.id
+                  ? "bg-sky-50 text-sky-700 border-r-2 border-sky-500"
+                  : "text-slate-600 hover:bg-slate-50"
               }`}
             >
               <span className="block font-semibold">{page.label}</span>
@@ -389,18 +408,27 @@ export function PageOutput({ tripId, onBack }: { tripId: string; onBack: () => v
               disabled={!canGoPrev}
               onClick={() => canGoPrev && setActivePage(pages[activeIndex - 1].id)}
               className="rounded-md bg-slate-600 disabled:bg-slate-400 text-white text-xs font-mono px-3 py-1.5 cursor-pointer hover:bg-slate-500"
-            >← 上一页</button>
+            >
+              ← 上一页
+            </button>
             <button
               disabled={!canGoNext}
               onClick={() => canGoNext && setActivePage(pages[activeIndex + 1].id)}
               className="rounded-md bg-slate-600 disabled:bg-slate-400 text-white text-xs font-mono px-3 py-1.5 cursor-pointer hover:bg-slate-500"
-            >下一页 →</button>
+            >
+              下一页 →
+            </button>
           </div>
         </div>
 
         {activePage === "cover" && <CoverPage itinerary={itinerary} totalPages={totalPages} />}
         {typeof activePage === "number" && (
-          <DayOutputPage itinerary={itinerary} day={itinerary.days[activePage]} pageNum={activePage + 2} totalPages={totalPages} />
+          <DayOutputPage
+            itinerary={itinerary}
+            day={itinerary.days[activePage]}
+            pageNum={activePage + 2}
+            totalPages={totalPages}
+          />
         )}
         {activePage === "budget" && <BudgetPage itinerary={itinerary} pageNum={totalPages} totalPages={totalPages} />}
       </div>

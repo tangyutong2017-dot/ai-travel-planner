@@ -1,72 +1,72 @@
-export type ApiTripStatus = 'planned' | 'completed'
-export type TripStatus = '计划中' | '已完成'
-export type TripFilter = TripStatus | '全部'
-export type TripSort = 'updatedAt_desc' | 'startDate_desc' | 'days_desc'
+export type ApiTripStatus = "planned" | "completed";
+export type TripStatus = "计划中" | "已完成";
+export type TripFilter = TripStatus | "全部";
+export type TripSort = "updatedAt_desc" | "startDate_desc" | "days_desc";
 
 export type Trip = {
-  id: string
-  name: string
-  dest: string
-  days: number
-  date: string
-  status: TripStatus
-  coverUrl?: string
-  updatedAt?: string
-  attractionCount?: number
-}
+  id: string;
+  name: string;
+  dest: string;
+  days: number;
+  date: string;
+  status: TripStatus;
+  coverUrl?: string;
+  updatedAt?: string;
+  attractionCount?: number;
+};
 
 export type TripListSummary = {
-  total: number
-  planned: number
-  completed: number
-  totalDays: number
-  destinationCount: number
-  attractionCount: number
-}
+  total: number;
+  planned: number;
+  completed: number;
+  totalDays: number;
+  destinationCount: number;
+  attractionCount: number;
+};
 
 export type TripListResponse = {
-  items: Trip[]
-  summary: TripListSummary
-}
+  items: Trip[];
+  summary: TripListSummary;
+};
 
 export type GetTripsParams = {
-  status?: ApiTripStatus
-  sort?: TripSort
-  keyword?: string
-}
+  status?: ApiTripStatus;
+  sort?: TripSort;
+  keyword?: string;
+};
 
 export type TravelersPayload = {
-  adults: number
-  children: number
-  infants: number
-}
+  adults: number;
+  children: number;
+  infants: number;
+};
 
 export type CreateTripPayload = {
-  destination: string
-  startDate: string
-  endDate: string
-  days: number
-  travelers: TravelersPayload
+  destination: string;
+  startDate: string;
+  endDate: string;
+  days: number;
+  travelers: TravelersPayload;
   budget: {
-    min: number
-    max: number
-  }
+    min: number;
+    max: number;
+  };
   preferences: {
-    interests: string[]
-    pace: number
-    transport: string[]
-    accommodation: string[]
-    customText: string
-  }
-}
+    interests: string[];
+    pace: number;
+    transport: string[];
+    accommodation: string[];
+    customText: string;
+  };
+};
 
 export type CreateTripResponse = {
-  tripId: string
-  jobId: string
-}
+  tripId: string;
+  jobId: string;
+};
 
 export const tripStatusToApi = (status: TripFilter): ApiTripStatus | undefined => {
-  if (status === '计划中') return 'planned'
-  if (status === '已完成') return 'completed'
-  return undefined
-}
+  if (status === "计划中") return "planned";
+  if (status === "已完成") return "completed";
+  return undefined;
+};

@@ -33,7 +33,9 @@ function EmptyTrips({ onCreate }: { onCreate: () => void }) {
       {/* 文案 */}
       <h2 className="text-xl font-bold text-slate-900 mb-2 text-center">还没有行程，出发规划吧</h2>
       <p className="text-sm text-slate-500 font-mono text-center max-w-xs leading-relaxed mb-8">
-        告诉 AI 你想去哪、几天、和谁去，<br />几秒内生成专属行程方案
+        告诉 AI 你想去哪、几天、和谁去，
+        <br />
+        几秒内生成专属行程方案
       </p>
 
       {/* 主 CTA */}
@@ -110,7 +112,9 @@ function TripsNoResults({
       <p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-slate-500">{description}</p>
       {hasCondition && (
         <p className="mt-2 text-[10px] font-mono text-slate-400">
-          当前条件：{keyword ? `关键词「${keyword}」` : ""}{keyword && filter !== "全部" ? " · " : ""}{filter !== "全部" ? filter : ""}
+          当前条件：{keyword ? `关键词「${keyword}」` : ""}
+          {keyword && filter !== "全部" ? " · " : ""}
+          {filter !== "全部" ? filter : ""}
         </p>
       )}
       <div className="mt-5 flex justify-center gap-2">
@@ -149,7 +153,9 @@ const landmarkCoverUrls: Array<[string, string]> = [
 ];
 
 function fallbackCoverUrl(destination: string) {
-  return landmarkCoverUrls.find(([keyword]) => destination.includes(keyword) || keyword.includes(destination))?.[1] ?? null;
+  return (
+    landmarkCoverUrls.find(([keyword]) => destination.includes(keyword) || keyword.includes(destination))?.[1] ?? null
+  );
 }
 
 const SUMMARY_FIELDS = [
@@ -186,14 +192,14 @@ export function PageMyTrips({
   const [isRenaming, setIsRenaming] = useState(false);
 
   const statusColors: Record<TripStatus, string> = {
-    "计划中": "border-sky-200 bg-sky-50 text-sky-700",
-    "已完成": "border-emerald-300 bg-emerald-50 text-emerald-700",
+    计划中: "border-sky-200 bg-sky-50 text-sky-700",
+    已完成: "border-emerald-300 bg-emerald-50 text-emerald-700",
   };
 
   const filterColors: Record<TripFilter, string> = {
-    "全部": "bg-slate-900 text-white border-slate-900",
-    "计划中": "bg-sky-600 text-white border-sky-600",
-    "已完成": "bg-emerald-600 text-white border-emerald-600",
+    全部: "bg-slate-900 text-white border-slate-900",
+    计划中: "bg-sky-600 text-white border-sky-600",
+    已完成: "bg-emerald-600 text-white border-emerald-600",
   };
 
   const sortLabels: Record<TripSort, string> = {
@@ -366,10 +372,14 @@ export function PageMyTrips({
               className="h-9 appearance-none rounded-md border border-slate-200 bg-white pl-3 pr-8 text-xs font-mono text-slate-600 outline-none transition-colors hover:border-sky-200 focus:border-sky-400"
             >
               {Object.entries(sortLabels).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
+                <option key={value} value={value}>
+                  {label}
+                </option>
               ))}
             </select>
-            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono text-slate-400">▾</span>
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono text-slate-400">
+              ▾
+            </span>
           </label>
           <label className="flex h-9 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 transition-colors focus-within:border-sky-400">
             <span className="text-xs font-mono text-slate-500">🔍</span>
@@ -425,95 +435,105 @@ export function PageMyTrips({
             </div>
           )}
 
-          {!isLoading && !errorMessage && visibleTrips.map((t: Trip) => (
-            (() => {
-              const coverUrl = t.coverUrl ?? fallbackCoverUrl(t.dest);
+          {!isLoading &&
+            !errorMessage &&
+            visibleTrips.map((t: Trip) =>
+              (() => {
+                const coverUrl = t.coverUrl ?? fallbackCoverUrl(t.dest);
 
-              return (
-                <WBox
-                  key={t.name}
-                  className="group cursor-pointer overflow-hidden hover:border-sky-200 hover:shadow-lg hover:shadow-sky-100/70 transition-all ring-1 ring-transparent hover:ring-sky-200/60"
-                  onClick={() => onOpenTrip(t.id)}
-                >
-                  {coverUrl ? (
-                    <div className="relative h-36 w-full overflow-hidden">
-                      <img className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" src={coverUrl} alt={`${t.name} 封面`} />
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/35 via-transparent to-white/5" />
-                      <div className="absolute left-3 bottom-3 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-mono text-slate-700 shadow-sm">
-                        {t.dest}
+                return (
+                  <WBox
+                    key={t.name}
+                    className="group cursor-pointer overflow-hidden hover:border-sky-200 hover:shadow-lg hover:shadow-sky-100/70 transition-all ring-1 ring-transparent hover:ring-sky-200/60"
+                    onClick={() => onOpenTrip(t.id)}
+                  >
+                    {coverUrl ? (
+                      <div className="relative h-36 w-full overflow-hidden">
+                        <img
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          src={coverUrl}
+                          alt={`${t.name} 封面`}
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/35 via-transparent to-white/5" />
+                        <div className="absolute left-3 bottom-3 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-mono text-slate-700 shadow-sm">
+                          {t.dest}
+                        </div>
+                      </div>
+                    ) : (
+                      <WImgBox className="w-full h-36" label={`封面 · ${t.dest}`} />
+                    )}
+                    <div className="p-4">
+                      <div className="flex items-start justify-between gap-1 mb-1">
+                        <p className="text-[15px] font-semibold text-slate-900 leading-tight group-hover:text-sky-700 transition-colors">
+                          {t.name}
+                        </p>
+                        <span
+                          className={`rounded-full text-[10px] font-mono border px-2 py-0.5 shrink-0 ${statusColors[t.status]}`}
+                        >
+                          {t.status}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 text-[10px] font-mono text-slate-500 mb-3">
+                        <span>📍 {t.dest}</span>
+                        <span>📅 {t.days}天</span>
+                      </div>
+                      <p className="text-[10px] font-mono text-slate-400 mb-3">出行日期 · {t.date}</p>
+                      <Divider className="mb-2" />
+                      <div className="flex gap-1.5">
+                        <WBtn
+                          label="继续编辑"
+                          small
+                          className="min-w-0 flex-1 text-center"
+                          onClick={(event) => {
+                            // 卡片本身也可点击，不拦住冒泡会导航两次、多压一条历史记录
+                            event.stopPropagation();
+                            onOpenTrip(t.id);
+                          }}
+                        />
+                        <button
+                          onClick={(event) => event.stopPropagation()}
+                          className="rounded-md border border-slate-200 bg-white px-3 py-1 text-[11px] font-mono text-slate-700 transition-all hover:-translate-y-px hover:border-sky-200 hover:bg-sky-50"
+                        >
+                          分享
+                        </button>
+                        <div className="relative">
+                          <button
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setOpenMenuTripId((current) => (current === t.id ? null : t.id));
+                            }}
+                            className="rounded-md border border-slate-200 bg-white px-3 py-1 text-[11px] font-mono text-slate-700 transition-all hover:-translate-y-px hover:border-sky-200 hover:bg-sky-50"
+                            aria-label={`${t.name} 更多操作`}
+                          >
+                            ···
+                          </button>
+                          {openMenuTripId === t.id && (
+                            <div
+                              className="absolute bottom-8 right-0 z-20 w-32 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg shadow-slate-200/70"
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              <button
+                                onClick={() => openRenameTrip(t)}
+                                className="block w-full px-3 py-2 text-left text-[11px] font-mono text-slate-600 transition-colors hover:bg-sky-50 hover:text-sky-700"
+                              >
+                                重命名
+                              </button>
+                              <button
+                                onClick={() => void handleDeleteTrip(t)}
+                                disabled={deletingTripId === t.id}
+                                className="block w-full px-3 py-2 text-left text-[11px] font-mono text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {deletingTripId === t.id ? "删除中" : "删除"}
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  ) : (
-                    <WImgBox className="w-full h-36" label={`封面 · ${t.dest}`} />
-                  )}
-                  <div className="p-4">
-                <div className="flex items-start justify-between gap-1 mb-1">
-                  <p className="text-[15px] font-semibold text-slate-900 leading-tight group-hover:text-sky-700 transition-colors">{t.name}</p>
-                  <span className={`rounded-full text-[10px] font-mono border px-2 py-0.5 shrink-0 ${statusColors[t.status]}`}>
-                    {t.status}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 text-[10px] font-mono text-slate-500 mb-3">
-                  <span>📍 {t.dest}</span>
-                  <span>📅 {t.days}天</span>
-                </div>
-                <p className="text-[10px] font-mono text-slate-400 mb-3">出行日期 · {t.date}</p>
-                <Divider className="mb-2" />
-                <div className="flex gap-1.5">
-                  <WBtn
-                    label="继续编辑"
-                    small
-                    className="min-w-0 flex-1 text-center"
-                    onClick={(event) => {
-                      // 卡片本身也可点击，不拦住冒泡会导航两次、多压一条历史记录
-                      event.stopPropagation();
-                      onOpenTrip(t.id);
-                    }}
-                  />
-                  <button
-                    onClick={(event) => event.stopPropagation()}
-                    className="rounded-md border border-slate-200 bg-white px-3 py-1 text-[11px] font-mono text-slate-700 transition-all hover:-translate-y-px hover:border-sky-200 hover:bg-sky-50"
-                  >
-                    分享
-                  </button>
-                  <div className="relative">
-                    <button
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setOpenMenuTripId((current) => (current === t.id ? null : t.id));
-                      }}
-                      className="rounded-md border border-slate-200 bg-white px-3 py-1 text-[11px] font-mono text-slate-700 transition-all hover:-translate-y-px hover:border-sky-200 hover:bg-sky-50"
-                      aria-label={`${t.name} 更多操作`}
-                    >
-                      ···
-                    </button>
-                    {openMenuTripId === t.id && (
-                      <div
-                        className="absolute bottom-8 right-0 z-20 w-32 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg shadow-slate-200/70"
-                        onClick={(event) => event.stopPropagation()}
-                      >
-                        <button
-                          onClick={() => openRenameTrip(t)}
-                          className="block w-full px-3 py-2 text-left text-[11px] font-mono text-slate-600 transition-colors hover:bg-sky-50 hover:text-sky-700"
-                        >
-                          重命名
-                        </button>
-                        <button
-                          onClick={() => void handleDeleteTrip(t)}
-                          disabled={deletingTripId === t.id}
-                          className="block w-full px-3 py-2 text-left text-[11px] font-mono text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {deletingTripId === t.id ? "删除中" : "删除"}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                  </div>
-                </WBox>
-              );
-            })()
-          ))}
+                  </WBox>
+                );
+              })(),
+            )}
 
           {!isLoading && !errorMessage && visibleTrips.length === 0 && (
             <TripsNoResults
@@ -529,7 +549,9 @@ export function PageMyTrips({
             className="rounded-lg border border-dashed border-sky-300 bg-white flex flex-col items-center justify-center min-h-56 cursor-pointer hover:bg-sky-50 transition-colors"
             onClick={onCreate}
           >
-            <div className="w-10 h-10 rounded-xl border-2 border-dashed border-sky-300 flex items-center justify-center text-2xl text-sky-500 mb-2">+</div>
+            <div className="w-10 h-10 rounded-xl border-2 border-dashed border-sky-300 flex items-center justify-center text-2xl text-sky-500 mb-2">
+              +
+            </div>
             <p className="text-sm font-medium text-slate-600">创建新行程</p>
             <p className="text-xs font-mono text-slate-400 mt-1">AI 帮你规划</p>
           </div>

@@ -1,6 +1,5 @@
 import type { MouseEvent, ReactNode } from "react";
 
-
 export function WBox({
   className = "",
   children,
@@ -22,7 +21,9 @@ export function WBox({
 
 export function WImgBox({ className = "", label = "图片占位" }: { className?: string; label?: string }) {
   return (
-    <div className={`border border-sky-100 bg-[linear-gradient(135deg,#e0f2fe,#f0fdfa_52%,#fff7ed)] flex items-center justify-center ${className}`}>
+    <div
+      className={`border border-sky-100 bg-[linear-gradient(135deg,#e0f2fe,#f0fdfa_52%,#fff7ed)] flex items-center justify-center ${className}`}
+    >
       <span className="text-[11px] text-slate-400 font-mono">{label}</span>
     </div>
   );
@@ -57,9 +58,7 @@ export function WBtn({
 }
 
 export function WAnnotation({ text }: { text: string }) {
-  return (
-    <span className="font-mono text-[9px] text-slate-400 leading-none">{text}</span>
-  );
+  return <span className="font-mono text-[9px] text-slate-400 leading-none">{text}</span>;
 }
 
 export function Divider({ className = "" }: { className?: string }) {

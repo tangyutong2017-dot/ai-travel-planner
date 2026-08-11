@@ -1,5 +1,11 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { deleteTripItem, getTripDetail, startTripGeneration, updateTripItem, type UpdateTripItemPayload } from "../../api/trips";
+import {
+  deleteTripItem,
+  getTripDetail,
+  startTripGeneration,
+  updateTripItem,
+  type UpdateTripItemPayload,
+} from "../../api/trips";
 import { ApiError } from "../../api/client";
 import { getJobStatus } from "../../api/jobs";
 import { Divider, WAnnotation, WBtn, WImgBox } from "../../components/ui/Primitives";
@@ -9,11 +15,21 @@ function hasPendingGeneratedDays(itinerary: Itinerary | null) {
   if (!itinerary) return false;
 
   return itinerary.days.some((day) =>
-    day.items.some((item) => item.type === "AI规划" || item.reason?.includes("占位数据") || item.reason?.includes("下一步由 LangGraph agent"))
+    day.items.some(
+      (item) =>
+        item.type === "AI规划" ||
+        item.reason?.includes("占位数据") ||
+        item.reason?.includes("下一步由 LangGraph agent"),
+    ),
   );
 }
 
-function AttractionCard({ item, onClick, onDelete, onEdit }: {
+function AttractionCard({
+  item,
+  onClick,
+  onDelete,
+  onEdit,
+}: {
   item: ItineraryItem;
   onClick: () => void;
   onDelete: () => void;
@@ -32,15 +48,19 @@ function AttractionCard({ item, onClick, onDelete, onEdit }: {
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm font-medium text-slate-800 leading-tight">{item.title}</p>
-          <span className="rounded-full text-[10px] font-mono text-sky-700 border border-sky-200 bg-sky-50 px-2 py-0.5 shrink-0">{item.type}</span>
+          <span className="rounded-full text-[10px] font-mono text-sky-700 border border-sky-200 bg-sky-50 px-2 py-0.5 shrink-0">
+            {item.type}
+          </span>
         </div>
-        <p className="text-xs font-mono text-slate-500 mt-1">{item.startTime} - {item.endTime}</p>
-        {item.address && (
-          <p className="mt-1 truncate text-[10px] font-mono text-slate-400">地址 · {item.address}</p>
-        )}
+        <p className="text-xs font-mono text-slate-500 mt-1">
+          {item.startTime} - {item.endTime}
+        </p>
+        {item.address && <p className="mt-1 truncate text-[10px] font-mono text-slate-400">地址 · {item.address}</p>}
         <div className="flex items-center gap-2 mt-2">
           {/* 评分曾是写死的 4.2 + 四颗星。数据模型里没有评分字段，接入真实 POI 评分前不展示。 */}
-          <span className="text-[10px] font-mono text-slate-500">预计 {item.durationLabel} · {item.cost === 0 ? "免费" : `¥${item.cost}`}</span>
+          <span className="text-[10px] font-mono text-slate-500">
+            预计 {item.durationLabel} · {item.cost === 0 ? "免费" : `¥${item.cost}`}
+          </span>
         </div>
       </div>
       <div className="flex flex-col gap-1 shrink-0">
@@ -70,7 +90,9 @@ function AttractionCard({ item, onClick, onDelete, onEdit }: {
 type EditingItemState = {
   day: number;
   item: ItineraryItem;
-  form: Required<Pick<UpdateTripItemPayload, "title" | "startTime" | "endTime" | "type" | "durationLabel" | "cost" | "reason">>;
+  form: Required<
+    Pick<UpdateTripItemPayload, "title" | "startTime" | "endTime" | "type" | "durationLabel" | "cost" | "reason">
+  >;
 };
 
 function CollapsibleSection({
@@ -108,7 +130,7 @@ function CollapsibleSection({
 
 function RouteMiniMap({ day }: { day: DayPlan }) {
   const points = day.items
-    .map((item, index) => item.location ? { item, index, lat: item.location.lat, lng: item.location.lng } : null)
+    .map((item, index) => (item.location ? { item, index, lat: item.location.lat, lng: item.location.lng } : null))
     .filter((point): point is { item: ItineraryItem; index: number; lat: number; lng: number } => point !== null);
 
   if (points.length === 0) {
@@ -194,7 +216,8 @@ function RightPanel({ day, onOutput }: { day: DayPlan; onOutput: () => void }) {
             ["耗时", day.route.durationLabel],
           ].map(([key, value]) => (
             <div key={key} className="flex justify-between text-[10px] font-mono text-slate-500">
-              <span>{key}</span><span className="font-medium text-slate-700">{value}</span>
+              <span>{key}</span>
+              <span className="font-medium text-slate-700">{value}</span>
             </div>
           ))}
         </div>
@@ -215,16 +238,21 @@ function RightPanel({ day, onOutput }: { day: DayPlan; onOutput: () => void }) {
           {budgetEntries.map(([key, value]) => (
             <div key={key}>
               <div className="flex justify-between text-[10px] font-mono text-slate-600 mb-0.5">
-                <span>{key}</span><span>¥ {value}</span>
+                <span>{key}</span>
+                <span>¥ {value}</span>
               </div>
               <div className="h-1.5 rounded-full bg-slate-100">
-                <div className="h-full rounded-full bg-sky-500" style={{ width: `${Math.round((value / budgetTotal) * 100)}%` }} />
+                <div
+                  className="h-full rounded-full bg-sky-500"
+                  style={{ width: `${Math.round((value / budgetTotal) * 100)}%` }}
+                />
               </div>
             </div>
           ))}
         </div>
         <div className="mt-2 pt-2 border-t border-slate-200 flex justify-between text-xs font-semibold font-mono text-slate-800">
-          <span>合计</span><span>¥ {budgetTotal}</span>
+          <span>合计</span>
+          <span>¥ {budgetTotal}</span>
         </div>
       </CollapsibleSection>
 
@@ -234,10 +262,15 @@ function RightPanel({ day, onOutput }: { day: DayPlan; onOutput: () => void }) {
             <div key={label}>
               <div className="mb-1 flex justify-between text-[10px] font-mono text-slate-600">
                 <span>{label}</span>
-                <span>{count}/{day.items.length}</span>
+                <span>
+                  {count}/{day.items.length}
+                </span>
               </div>
               <div className="h-1.5 rounded-full bg-slate-100">
-                <div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.round((count / totalItems) * 100)}%` }} />
+                <div
+                  className="h-full rounded-full bg-emerald-500"
+                  style={{ width: `${Math.round((count / totalItems) * 100)}%` }}
+                />
               </div>
             </div>
           ))}
@@ -392,15 +425,9 @@ export function PageWorkspace({
           <p className="text-sm font-medium text-slate-800">这个行程还没有生成内容</p>
           <p className="mt-1.5 text-xs text-slate-500">生成后即可在工作区逐日编辑安排。</p>
           <div className="mt-4">
-            <WBtn
-              label={isGenerating ? "生成中..." : "立即生成行程"}
-              primary
-              onClick={() => void handleGenerate()}
-            />
+            <WBtn label={isGenerating ? "生成中..." : "立即生成行程"} primary onClick={() => void handleGenerate()} />
           </div>
-          {generationMessage && (
-            <p className="mt-3 text-[11px] font-mono text-slate-400">{generationMessage}</p>
-          )}
+          {generationMessage && <p className="mt-3 text-[11px] font-mono text-slate-400">{generationMessage}</p>}
         </div>
       </div>
     );
@@ -458,7 +485,7 @@ export function PageWorkspace({
   };
 
   const patchEditingForm = (patch: Partial<EditingItemState["form"]>) => {
-    setEditingItem((current) => current ? { ...current, form: { ...current.form, ...patch } } : current);
+    setEditingItem((current) => (current ? { ...current, form: { ...current.form, ...patch } } : current));
   };
 
   const handleSaveItem = async () => {
@@ -482,14 +509,18 @@ export function PageWorkspace({
       <div className="hidden lg:flex w-40 border-r border-slate-200 bg-white flex-col shrink-0">
         <div className="p-3 border-b border-slate-100">
           <WAnnotation text="日程导航" />
-          <p className="text-xs font-semibold text-slate-700 mt-0.5">{itinerary.destination} · {itinerary.days.length}天</p>
+          <p className="text-xs font-semibold text-slate-700 mt-0.5">
+            {itinerary.destination} · {itinerary.days.length}天
+          </p>
         </div>
         {itinerary.days.map((dayItem, index) => (
           <button
             key={dayItem.day}
             onClick={() => setActiveDay(index)}
             className={`text-left px-3 py-2.5 text-xs font-mono border-b border-slate-100 cursor-pointer transition-colors ${
-              index === activeDay ? "bg-sky-50 text-sky-700 border-r-2 border-sky-500" : "text-slate-600 hover:bg-slate-50"
+              index === activeDay
+                ? "bg-sky-50 text-sky-700 border-r-2 border-sky-500"
+                : "text-slate-600 hover:bg-slate-50"
             }`}
           >
             <span className="block font-semibold">第{dayItem.day}天</span>
@@ -507,10 +538,16 @@ export function PageWorkspace({
         <div className="border-b border-slate-200 bg-white/95 px-4 py-3 shrink-0 shadow-sm shadow-slate-200/50">
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="truncate text-sm font-semibold text-slate-900">第{day.day}天 · {day.date} · {day.title}</span>
-              <span className="hidden xl:block"><WAnnotation text="← 当天主题自动生成" /></span>
+              <span className="truncate text-sm font-semibold text-slate-900">
+                第{day.day}天 · {day.date} · {day.title}
+              </span>
+              <span className="hidden xl:block">
+                <WAnnotation text="← 当天主题自动生成" />
+              </span>
             </div>
-            <div className="hidden xl:block"><WAnnotation text="复杂调整请使用下方 AI 输入框" /></div>
+            <div className="hidden xl:block">
+              <WAnnotation text="复杂调整请使用下方 AI 输入框" />
+            </div>
             {/* 右栏在 < 1280px 时隐藏，主 CTA 移到这里，避免用户找不到「输出方案」 */}
             <div className="xl:hidden shrink-0">
               <WBtn label="输出行程方案 →" primary small onClick={onOutput} />
@@ -585,7 +622,9 @@ export function PageWorkspace({
               <WImgBox className="w-6 h-6 rounded-full shrink-0" label="" />
               <div className="min-w-0">
                 <p className="text-xs font-medium text-slate-700">AI 调整功能正在重构</p>
-                <p className="mt-0.5 text-[10px] font-mono text-slate-400">当前保留手动编辑和删除；新的 Editing Agent 会在后续重新接入。</p>
+                <p className="mt-0.5 text-[10px] font-mono text-slate-400">
+                  当前保留手动编辑和删除；新的 Editing Agent 会在后续重新接入。
+                </p>
               </div>
             </div>
           </div>
@@ -703,15 +742,26 @@ export function ModalAttraction({ item, onClose }: { item: ItineraryItem; onClos
         <div className="p-5">
           <div className="flex gap-4 mb-4">
             {item.imageUrl ? (
-              <img className="h-36 w-52 shrink-0 rounded-lg object-cover" src={item.imageUrl} alt={`${item.title} 主图`} />
+              <img
+                className="h-36 w-52 shrink-0 rounded-lg object-cover"
+                src={item.imageUrl}
+                alt={`${item.title} 主图`}
+              />
             ) : (
               <WImgBox className="w-52 h-36 shrink-0 rounded-lg" label="景点主图" />
             )}
             <div className="flex-1">
               <div className="flex flex-wrap gap-1.5 mb-3">
-                {[item.type, item.source === "amap" ? "高德验证" : "AI生成", item.poiId ? "POI" : "未匹配POI"].map((tag) => (
-                  <span key={tag} className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-mono text-slate-600">{tag}</span>
-                ))}
+                {[item.type, item.source === "amap" ? "高德验证" : "AI生成", item.poiId ? "POI" : "未匹配POI"].map(
+                  (tag) => (
+                    <span
+                      key={tag}
+                      className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-mono text-slate-600"
+                    >
+                      {tag}
+                    </span>
+                  ),
+                )}
               </div>
               <div className="space-y-1.5">
                 {detailRows.map(([key, value]) => (
@@ -751,9 +801,13 @@ export function ModalAttraction({ item, onClose }: { item: ItineraryItem; onClos
 
           <Divider className="mb-4" />
           <div className="flex gap-2 justify-end">
-            <WBtn label="复制位置" small onClick={() => {
-              if (item.location) void navigator.clipboard?.writeText(`${item.location.lat},${item.location.lng}`);
-            }} />
+            <WBtn
+              label="复制位置"
+              small
+              onClick={() => {
+                if (item.location) void navigator.clipboard?.writeText(`${item.location.lat},${item.location.lng}`);
+              }}
+            />
             <WBtn label="✓ 已在行程中" primary small />
           </div>
         </div>

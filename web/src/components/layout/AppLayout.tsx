@@ -20,8 +20,12 @@ export function TopNav({ title }: { title: string }) {
       </div>
       {/* Right: actions + user */}
       <div className="border-l border-slate-100 px-4 flex items-center gap-3 shrink-0">
-        <button className="rounded-md text-[11px] font-mono text-slate-500 border border-slate-200 px-3 py-1.5 hover:bg-sky-50 hover:border-sky-200 cursor-pointer">🔔</button>
-        <button className="rounded-md text-[11px] font-mono text-slate-500 border border-slate-200 px-3 py-1.5 hover:bg-sky-50 hover:border-sky-200 cursor-pointer">设置</button>
+        <button className="rounded-md text-[11px] font-mono text-slate-500 border border-slate-200 px-3 py-1.5 hover:bg-sky-50 hover:border-sky-200 cursor-pointer">
+          🔔
+        </button>
+        <button className="rounded-md text-[11px] font-mono text-slate-500 border border-slate-200 px-3 py-1.5 hover:bg-sky-50 hover:border-sky-200 cursor-pointer">
+          设置
+        </button>
         <div className="flex items-center gap-2">
           <WImgBox className="w-8 h-8 rounded-full" label="" />
           <span className="text-[11px] font-mono text-slate-600">用户名</span>
@@ -34,9 +38,9 @@ export function TopNav({ title }: { title: string }) {
 // ─── LeftSidebar ────────────────────────────────────────────────────────────
 
 const NAV_ITEMS = [
-  { id: "mytrips",   icon: "⊞", label: "我的行程" },
+  { id: "mytrips", icon: "⊞", label: "我的行程" },
   { id: "workspace", icon: "▦", label: "行程工作区" },
-  { id: "output",    icon: "⬡", label: "输出预览" },
+  { id: "output", icon: "⬡", label: "输出预览" },
 ];
 
 export function LeftSidebar({
@@ -95,8 +99,12 @@ export function LeftSidebar({
             className="w-full text-left flex items-center gap-2 py-1.5 text-xs font-mono text-slate-500 hover:text-slate-900 cursor-pointer transition-colors"
           >
             <span className="w-1.5 h-1.5 bg-sky-400 rounded-full shrink-0" />
-            <span className="flex-1 truncate">{trip.dest} {trip.days}日</span>
-            <span className={`text-[10px] ${trip.status === "计划中" ? "text-sky-300" : "text-emerald-400"}`}>{trip.status}</span>
+            <span className="flex-1 truncate">
+              {trip.dest} {trip.days}日
+            </span>
+            <span className={`text-[10px] ${trip.status === "计划中" ? "text-sky-300" : "text-emerald-400"}`}>
+              {trip.status}
+            </span>
           </button>
         ))}
         {recentTrips.length === 0 && (

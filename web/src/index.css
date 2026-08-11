@@ -10,17 +10,28 @@ html {
 }
 
 body {
-  font-family: Inter, "Noto Sans SC", system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-family:
+    Inter,
+    "Noto Sans SC",
+    system-ui,
+    -apple-system,
+    "PingFang SC",
+    "Microsoft YaHei",
+    sans-serif;
   font-size: 14px;
   color: #162033;
   background:
     radial-gradient(circle at 18% 0%, rgba(56, 189, 248, 0.12), transparent 30%),
-    radial-gradient(circle at 86% 14%, rgba(20, 184, 166, 0.10), transparent 28%),
+    radial-gradient(circle at 86% 14%, rgba(20, 184, 166, 0.1), transparent 28%),
     linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
     linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px),
-    linear-gradient(180deg, rgba(239, 247, 255, 0.88), rgba(248, 250, 252, 0.94) 42%, #f6f8fb),
-    #f6f8fb;
-  background-size: auto, auto, 32px 32px, 32px 32px, auto;
+    linear-gradient(180deg, rgba(239, 247, 255, 0.88), rgba(248, 250, 252, 0.94) 42%, #f6f8fb), #f6f8fb;
+  background-size:
+    auto,
+    auto,
+    32px 32px,
+    32px 32px,
+    auto;
 }
 
 button,
