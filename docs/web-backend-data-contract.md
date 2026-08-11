@@ -47,6 +47,9 @@ type Trip = {
 }
 ```
 
+`summary` 统计的是**当前筛选结果**，不是全库，因此 `summary.total` 恒等于
+`items.length`。切换筛选或搜索时统计条会跟着变。
+
 前端展示逻辑：
 
 - 点击 `全部`：请求 `GET /api/trips`

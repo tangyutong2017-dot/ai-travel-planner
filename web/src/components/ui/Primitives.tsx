@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 
 
 export function WBox({
@@ -39,7 +39,8 @@ export function WBtn({
   primary?: boolean;
   small?: boolean;
   className?: string;
-  onClick?: () => void;
+  // 透传事件，调用方在嵌套可点击容器里才能 stopPropagation
+  onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
 }) {
   return (
     <button

@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .amap import AmapUnavailableError, search_poi
-from .models import AgentJob, CreateTripPayload, Itinerary, Trip, TripListResponse, UpdateItineraryItemPayload
+from .models import AgentJob, CreateTripPayload, Itinerary, Trip, TripListResponse, TripListSummary, UpdateItineraryItemPayload
 from .orm_models import AgentJobRecord, ItineraryRecord, TripRecord
 
 
@@ -215,7 +215,24 @@ def list_trips(db: Session, status: str | None = None, keyword: str | None = Non
     else:
         records.sort(key=lambda trip: trip.updated_at or trip.created_at, reverse=True)
 
-    return TripListResponse(items=[trip_from_record(record) for record in records])
+    items = [trip_from_record(record) for record in records]
+    return TripListResponse(items=items, summary=summarize_trips(items))
+
+
+def summarize_trips(items: list[Trip]) -> TripListSummary:
+    """Aggregate the trips that are actually being returned.
+
+    The summary describes the filtered result set, not the whole library, so
+    ``summary.total`` always equals ``len(items)``.
+    """
+    return TripListSummary(
+        total=len(items),
+        planned=sum(1 for trip in items if trip.status == "planned"),
+        completed=sum(1 for trip in items if trip.status == "completed"),
+        totalDays=sum(trip.days for trip in items),
+        destinationCount=len({trip.dest for trip in items}),
+        attractionCount=sum(trip.attractionCount or 0 for trip in items),
+    )
 
 
 def get_trip(db: Session, trip_id: str) -> Trip | None:

@@ -72,15 +72,15 @@ def get_trip_detail(trip_id: str, db: Session = Depends(get_db)) -> Itinerary:
         return itinerary
 
     if not get_trip(db, trip_id):
-        raise HTTPException(status_code=404, detail="Trip not found")
+        raise HTTPException(status_code=404, detail="行程不存在或已被删除")
 
-    raise HTTPException(status_code=409, detail="Trip itinerary has not been generated")
+    raise HTTPException(status_code=409, detail="该行程还没有生成过内容")
 
 
 @app.delete("/api/trips/{trip_id}")
 def delete_trip_route(trip_id: str, db: Session = Depends(get_db)) -> dict[str, str]:
     if not delete_trip(db, trip_id):
-        raise HTTPException(status_code=404, detail="Trip not found")
+        raise HTTPException(status_code=404, detail="行程不存在或已被删除")
 
     return {"tripId": trip_id}
 
@@ -93,7 +93,7 @@ def update_trip_route(
 ) -> Trip:
     updated = update_trip_name(db, trip_id, payload.name)
     if not updated:
-        raise HTTPException(status_code=404, detail="Trip not found")
+        raise HTTPException(status_code=404, detail="行程不存在或已被删除")
 
     return updated
 
@@ -107,7 +107,7 @@ def delete_trip_item_route(
 ) -> Itinerary:
     updated = delete_itinerary_item(db, trip_id, day_number, item_id)
     if not updated:
-        raise HTTPException(status_code=404, detail="Itinerary item not found")
+        raise HTTPException(status_code=404, detail="没有找到这个行程项目")
 
     return updated
 
@@ -122,7 +122,7 @@ def update_trip_item_route(
 ) -> Itinerary:
     updated = update_itinerary_item(db, trip_id, day_number, item_id, payload)
     if not updated:
-        raise HTTPException(status_code=404, detail="Itinerary item not found")
+        raise HTTPException(status_code=404, detail="没有找到这个行程项目")
 
     return updated
 
@@ -134,7 +134,7 @@ def generate_trip(
     db: Session = Depends(get_db),
 ) -> GenerateTripResponse:
     if not get_trip(db, trip_id):
-        raise HTTPException(status_code=404, detail="Trip not found")
+        raise HTTPException(status_code=404, detail="行程不存在或已被删除")
 
     job = start_generation_job(trip_id)
     background_tasks.add_task(run_generation_job, job.jobId)
@@ -145,6 +145,6 @@ def generate_trip(
 def get_job(job_id: str) -> AgentJob:
     job = get_generation_job(job_id)
     if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
+        raise HTTPException(status_code=404, detail="生成任务不存在或已过期")
 
     return job

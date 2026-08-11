@@ -1,5 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { deleteTripItem, getTripDetail, updateTripItem, type UpdateTripItemPayload } from "../../api/trips";
+import { deleteTripItem, getTripDetail, startTripGeneration, updateTripItem, type UpdateTripItemPayload } from "../../api/trips";
+import { ApiError } from "../../api/client";
+import { getJobStatus } from "../../api/jobs";
 import { Divider, WAnnotation, WBtn, WImgBox } from "../../components/ui/Primitives";
 import type { DayPlan, Itinerary, ItineraryItem } from "../../types/itinerary";
 
@@ -280,6 +282,10 @@ export function PageWorkspace({
   const [itinerary, setItinerary] = useState<Itinerary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  // 409 = 行程存在但从未生成过内容，这不是错误，是一个可以就地补救的状态
+  const [needsGeneration, setNeedsGeneration] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationMessage, setGenerationMessage] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const [mutationMessage, setMutationMessage] = useState("");
   const [editingItem, setEditingItem] = useState<EditingItemState | null>(null);
@@ -290,6 +296,7 @@ export function PageWorkspace({
     async function loadTripDetail() {
       setIsLoading(true);
       setErrorMessage("");
+      setNeedsGeneration(false);
 
       try {
         const detail = await getTripDetail(tripId);
@@ -299,7 +306,11 @@ export function PageWorkspace({
         }
       } catch (error) {
         if (!ignore) {
-          setErrorMessage(error instanceof Error ? error.message : "行程详情加载失败");
+          if (error instanceof ApiError && error.status === 409) {
+            setNeedsGeneration(true);
+          } else {
+            setErrorMessage(error instanceof Error ? error.message : "行程详情加载失败");
+          }
         }
       } finally {
         if (!ignore) {
@@ -337,6 +348,59 @@ export function PageWorkspace({
         <div className="rounded-xl border border-slate-200 bg-white px-8 py-6 text-center shadow-sm">
           <p className="text-sm font-medium text-slate-800">正在加载行程工作区...</p>
           <p className="text-xs font-mono text-slate-400 mt-1">正在同步行程详情</p>
+        </div>
+      </div>
+    );
+  }
+
+  async function handleGenerate() {
+    setIsGenerating(true);
+    setGenerationMessage("正在提交生成任务");
+
+    try {
+      const { jobId } = await startTripGeneration(tripId);
+
+      for (let attempt = 0; attempt < 60; attempt += 1) {
+        const job = await getJobStatus(jobId, tripId);
+        setGenerationMessage(job.message);
+
+        if (job.status === "succeeded") {
+          setReloadKey((key) => key + 1);
+          return;
+        }
+
+        if (job.status === "failed") {
+          setGenerationMessage(job.message || "生成失败，请稍后重试");
+          return;
+        }
+
+        await new Promise((resolve) => window.setTimeout(resolve, 1000));
+      }
+
+      setGenerationMessage("生成超时，请稍后重试");
+    } catch (error) {
+      setGenerationMessage(error instanceof Error ? error.message : "生成失败");
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
+  if (needsGeneration) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-slate-50">
+        <div className="max-w-sm rounded-xl border border-slate-200 bg-white px-8 py-7 text-center shadow-sm">
+          <p className="text-sm font-medium text-slate-800">这个行程还没有生成内容</p>
+          <p className="mt-1.5 text-xs text-slate-500">生成后即可在工作区逐日编辑安排。</p>
+          <div className="mt-4">
+            <WBtn
+              label={isGenerating ? "生成中..." : "立即生成行程"}
+              primary
+              onClick={() => void handleGenerate()}
+            />
+          </div>
+          {generationMessage && (
+            <p className="mt-3 text-[11px] font-mono text-slate-400">{generationMessage}</p>
+          )}
         </div>
       </div>
     );
@@ -460,7 +524,8 @@ export function PageWorkspace({
           )}
           <div className="flex items-center gap-2 mb-4">
             <WImgBox className="w-4 h-4" label="" />
-            <span className="text-xs font-mono text-slate-500">出发点：新宿酒店</span>
+            {/* TODO(backend): 住宿信息尚未进入数据模型，暂以目的地兜底 */}
+            <span className="text-xs font-mono text-slate-500">出发点：{itinerary.destination}</span>
           </div>
 
           {day.items.map((item, index) => (

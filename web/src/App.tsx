@@ -173,10 +173,6 @@ export default function App() {
       className="flex flex-col h-screen bg-gray-50 relative overflow-hidden"
       style={{ fontFamily: "'Inter', sans-serif" }}
     >
-      <div className="bg-slate-950 text-sky-100 text-[10px] font-mono text-center py-1 tracking-widest shrink-0">
-        AI TRAVEL PLANNER · CONNECTED WORKSPACE · READY FOR BACKEND API
-      </div>
-
       <TopNav title={topNavTitle} />
 
       <div className="flex-1 flex overflow-hidden relative">

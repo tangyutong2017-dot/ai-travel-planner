@@ -73,8 +73,18 @@ class UpdateTripPayload(BaseModel):
     name: str = Field(min_length=1, max_length=80)
 
 
+class TripListSummary(BaseModel):
+    total: int
+    planned: int
+    completed: int
+    totalDays: int
+    destinationCount: int
+    attractionCount: int
+
+
 class TripListResponse(BaseModel):
     items: list[Trip]
+    summary: TripListSummary
 
 
 class ItineraryItem(BaseModel):

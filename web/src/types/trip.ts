@@ -15,8 +15,18 @@ export type Trip = {
   attractionCount?: number
 }
 
+export type TripListSummary = {
+  total: number
+  planned: number
+  completed: number
+  totalDays: number
+  destinationCount: number
+  attractionCount: number
+}
+
 export type TripListResponse = {
   items: Trip[]
+  summary: TripListSummary
 }
 
 export type GetTripsParams = {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { deleteTrip, getTrips, updateTripName } from "../../api/trips";
-import type { Trip, TripFilter, TripListResponse, TripSort, TripStatus } from "../../types/trip";
+import type { Trip, TripFilter, TripListResponse, TripListSummary, TripSort, TripStatus } from "../../types/trip";
 import { tripStatusToApi } from "../../types/trip";
 import { Divider, WAnnotation, WBox, WBtn, WImgBox } from "../../components/ui/Primitives";
 
@@ -151,6 +151,15 @@ const landmarkCoverUrls: Array<[string, string]> = [
 function fallbackCoverUrl(destination: string) {
   return landmarkCoverUrls.find(([keyword]) => destination.includes(keyword) || keyword.includes(destination))?.[1] ?? null;
 }
+
+const SUMMARY_FIELDS = [
+  { key: "total", label: "行程", unit: "个" },
+  { key: "planned", label: "计划中", unit: "个" },
+  { key: "completed", label: "已完成", unit: "个" },
+  { key: "totalDays", label: "总天数", unit: "天" },
+  { key: "destinationCount", label: "目的地", unit: "个" },
+  { key: "attractionCount", label: "景点", unit: "处" },
+] as const satisfies readonly { key: keyof TripListSummary; label: string; unit: string }[];
 
 export function PageMyTrips({
   onCreate,
@@ -382,6 +391,19 @@ export function PageMyTrips({
           </label>
         </div>
 
+        {/* Summary stats — 后端 GET /api/trips 的 summary，统计的是当前筛选结果 */}
+        {tripData && tripData.summary.total > 0 && (
+          <div className="mb-5 flex flex-wrap items-center gap-x-8 gap-y-2 rounded-xl border border-slate-200/80 bg-white/85 px-4 py-3 shadow-sm shadow-slate-200/50 backdrop-blur">
+            {SUMMARY_FIELDS.map(({ key, label, unit }) => (
+              <div key={key} className="flex items-baseline gap-1.5">
+                <span className="text-lg font-semibold tabular-nums text-slate-800">{tripData.summary[key]}</span>
+                <span className="text-[11px] font-mono text-slate-500">{unit}</span>
+                <span className="text-[11px] text-slate-400">{label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Trip cards grid */}
         <div className="grid grid-cols-3 gap-5">
           {isLoading && (
@@ -438,7 +460,16 @@ export function PageMyTrips({
                 <p className="text-[10px] font-mono text-slate-400 mb-3">出行日期 · {t.date}</p>
                 <Divider className="mb-2" />
                 <div className="flex gap-1.5">
-                  <WBtn label="继续编辑" small className="min-w-0 flex-1 text-center" onClick={() => onOpenTrip(t.id)} />
+                  <WBtn
+                    label="继续编辑"
+                    small
+                    className="min-w-0 flex-1 text-center"
+                    onClick={(event) => {
+                      // 卡片本身也可点击，不拦住冒泡会导航两次、多压一条历史记录
+                      event.stopPropagation();
+                      onOpenTrip(t.id);
+                    }}
+                  />
                   <button
                     onClick={(event) => event.stopPropagation()}
                     className="rounded-md border border-slate-200 bg-white px-3 py-1 text-[11px] font-mono text-slate-700 transition-all hover:-translate-y-px hover:border-sky-200 hover:bg-sky-50"
