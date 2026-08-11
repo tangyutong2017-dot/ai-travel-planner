@@ -9,7 +9,7 @@ from ..amap import AmapUnavailableError, search_poi
 from ..models import Itinerary, UpdateItineraryItemPayload
 from ..orm_models import ItineraryRecord, TripRecord
 from .covers import cover_url_from_days
-from .mappers import count_major_itinerary_items, itinerary_from_record, sum_major_item_cost
+from .mappers import count_major_itinerary_items, itinerary_from_record
 from .naming import now_iso
 
 
@@ -97,11 +97,7 @@ def delete_itinerary_item(db: Session, trip_id: str, day_number: int, item_id: s
             continue
 
         changed = True
-        updated_budget = {
-            **day.budget,
-            "门票": sum_major_item_cost(updated_items),
-        }
-        updated_days.append(day.model_copy(update={"items": updated_items, "budget": updated_budget}))
+        updated_days.append(day.model_copy(update={"items": updated_items}))
 
     if not changed:
         return None
@@ -142,11 +138,7 @@ def update_itinerary_item(
             changed = True
             updated_items.append(item.model_copy(update=patch))
 
-        updated_budget = {
-            **day.budget,
-            "门票": sum_major_item_cost(updated_items),
-        }
-        updated_days.append(day.model_copy(update={"items": updated_items, "budget": updated_budget}))
+        updated_days.append(day.model_copy(update={"items": updated_items}))
 
     if not changed:
         return None

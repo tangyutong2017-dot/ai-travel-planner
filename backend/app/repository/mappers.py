@@ -61,13 +61,5 @@ def count_major_itinerary_items(days: list) -> int:
     return total
 
 
-def sum_major_item_cost(items: list) -> int:
-    total = 0
-    for item in items:
-        if item.countsAsMajorPlace and not item.mealType:
-            total += item.cost
-    return total
-
-
 def trip_date_sort_value(record: TripRecord) -> str:
     return record.date.replace(".", "-")

@@ -99,8 +99,6 @@ function RouteMiniMap({ day }: { day: DayPlan }) {
 }
 
 export function RightPanel({ day, onOutput }: { day: DayPlan; onOutput: () => void }) {
-  const budgetEntries = Object.entries(day.budget);
-  const budgetTotal = budgetEntries.reduce((sum, [, value]) => sum + value, 0);
   const formatKm = (value: number) => `${Number(value.toFixed(1))} km`;
   const dataStats = [
     ["POI", day.items.filter((item) => item.poiId).length],
@@ -138,29 +136,6 @@ export function RightPanel({ day, onOutput }: { day: DayPlan; onOutput: () => vo
           <p className="text-[10px] font-mono text-slate-400">{day.weather.range}</p>
         </div>
         {day.weather.tip && <p className="text-[10px] font-mono text-slate-400 mt-2">{day.weather.tip}</p>}
-      </CollapsibleSection>
-
-      <CollapsibleSection title="预算概览" badge={`¥ ${budgetTotal}`} defaultOpen={false}>
-        <div className="space-y-1.5">
-          {budgetEntries.map(([key, value]) => (
-            <div key={key}>
-              <div className="flex justify-between text-[10px] font-mono text-slate-600 mb-0.5">
-                <span>{key}</span>
-                <span>¥ {value}</span>
-              </div>
-              <div className="h-1.5 rounded-full bg-slate-100">
-                <div
-                  className="h-full rounded-full bg-sky-500"
-                  style={{ width: `${Math.round((value / budgetTotal) * 100)}%` }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="mt-2 pt-2 border-t border-slate-200 flex justify-between text-xs font-semibold font-mono text-slate-800">
-          <span>合计</span>
-          <span>¥ {budgetTotal}</span>
-        </div>
       </CollapsibleSection>
 
       <CollapsibleSection title="数据质量" badge={`${day.items.length} 项`} defaultOpen={false}>

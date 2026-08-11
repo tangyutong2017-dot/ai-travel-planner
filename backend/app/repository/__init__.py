@@ -20,7 +20,6 @@ from .mappers import (  # noqa: F401
     count_major_itinerary_items,
     itinerary_from_record,
     job_from_record,
-    sum_major_item_cost,
     trip_date_sort_value,
     trip_from_record,
 )
@@ -83,7 +82,6 @@ __all__ = [
     "now_iso",
     "save_itinerary",
     "seed_initial_data",
-    "sum_major_item_cost",
     "summarize_trips",
     "trip_date_sort_value",
     "trip_from_record",

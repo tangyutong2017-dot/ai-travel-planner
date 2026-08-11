@@ -30,10 +30,6 @@ const initialForm: WizardForm = {
     children: 0,
     infants: 0,
   },
-  budget: {
-    min: 0,
-    max: 12000,
-  },
   preferences: {
     interests: ["自然风光", "美食探索", "文化历史"],
     pace: 50,
@@ -73,13 +69,6 @@ export function WizardOverlay({ onClose, onDone }: { onClose: () => void; onDone
     setForm((current) => ({
       ...current,
       travelers: { ...current.travelers, ...patch },
-    }));
-  };
-
-  const patchBudget = (patch: Partial<WizardForm["budget"]>) => {
-    setForm((current) => ({
-      ...current,
-      budget: { ...current.budget, ...patch },
     }));
   };
 
@@ -158,13 +147,7 @@ export function WizardOverlay({ onClose, onDone }: { onClose: () => void; onDone
 
       <div className="relative flex-1 flex flex-col overflow-hidden">
         {step === "create" && (
-          <PageCreate
-            form={form}
-            onPatchForm={patchForm}
-            onPatchTravelers={patchTravelers}
-            onPatchBudget={patchBudget}
-            onNext={handleBasicNext}
-          />
+          <PageCreate form={form} onPatchForm={patchForm} onPatchTravelers={patchTravelers} onNext={handleBasicNext} />
         )}
         {step === "preferences" && (
           <PagePreferences
@@ -277,13 +260,11 @@ function PageCreate({
   form,
   onPatchForm,
   onPatchTravelers,
-  onPatchBudget,
   onNext,
 }: {
   form: WizardForm;
   onPatchForm: (patch: Partial<WizardForm>) => void;
   onPatchTravelers: (patch: Partial<WizardForm["travelers"]>) => void;
-  onPatchBudget: (patch: Partial<WizardForm["budget"]>) => void;
   onNext: () => void;
 }) {
   const days = calculateDays(form.startDate, form.endDate);
@@ -368,22 +349,6 @@ function PageCreate({
                   </div>
                 );
               })}
-            </div>
-
-            <SectionTitle text="预算范围（可选）" />
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <Field
-                label="最低预算（元）"
-                type="number"
-                value={form.budget.min}
-                onChange={(min) => onPatchBudget({ min: Number(min) })}
-              />
-              <Field
-                label="最高预算（元）"
-                type="number"
-                value={form.budget.max}
-                onChange={(max) => onPatchBudget({ max: Number(max) })}
-              />
             </div>
 
             <Divider className="mb-4" />

@@ -60,7 +60,7 @@ function EmptyTrips({ onCreate }: { onCreate: () => void }) {
       {/* 功能亮点提示 */}
       <div className="mt-12 grid grid-cols-3 gap-6 max-w-lg">
         {[
-          { icon: "◈", title: "个性化偏好", desc: "根据兴趣、节奏、预算智能推荐" },
+          { icon: "◈", title: "个性化偏好", desc: "根据兴趣、节奏、出行方式智能推荐" },
           { icon: "▦", title: "可视化编辑", desc: "拖拽调整景点，实时预览路线" },
           { icon: "⬡", title: "一键导出", desc: "PDF、日历、分享链接多格式输出" },
         ].map((f) => (
@@ -334,7 +334,7 @@ export function PageMyTrips({
           <div>
             <WAnnotation text="Trips dashboard" />
             <h1 className="text-[22px] font-bold text-slate-950 mt-1">我的行程</h1>
-            <p className="text-[13px] text-slate-500 mt-1">管理计划中的旅程，查看已完成的路线和预算概览。</p>
+            <p className="text-[13px] text-slate-500 mt-1">管理计划中的旅程，查看已完成的路线和每日安排。</p>
           </div>
           <div className="flex items-center gap-3">
             <button

@@ -35,7 +35,6 @@ check("health 可用", s == 200 and d.get("status") == "ok", f"{s} {d}")
 payload = {
     "destination": "成都", "startDate": "2026-10-01", "endDate": "2026-10-03", "days": 3,
     "travelers": {"adults": 2, "children": 0, "infants": 0},
-    "budget": {"min": 0, "max": 6000},
     "preferences": {"interests": ["美食探索", "文化历史"], "pace": 40,
                     "transport": ["公共交通"], "accommodation": ["酒店"], "customText": "慢一点"},
 }
@@ -68,7 +67,7 @@ s, detail = call("GET", f"/api/trips/{trip}")
 check("生成后可取详情", s == 200, f"{s} {detail}")
 check("天数与创建请求一致", s == 200 and len(detail.get("days", [])) == 3, str(len(detail.get("days", []))))
 d1 = detail["days"][0] if s == 200 and detail.get("days") else {}
-for field in ("day", "date", "title", "weather", "budget", "route", "items"):
+for field in ("day", "date", "title", "weather", "route", "items"):
     check(f"DayPlan 含 {field}", field in d1)
 it = d1.get("items", [{}])[0]
 for field in ("id", "startTime", "endTime", "title", "type", "durationLabel", "cost"):

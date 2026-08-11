@@ -3,20 +3,7 @@ import { getTripDetail } from "../../api/trips";
 import { Divider, WBtn, WImgBox } from "../../components/ui/Primitives";
 import type { DayPlan, Itinerary } from "../../types/itinerary";
 
-type OutputPageId = "cover" | "budget" | number;
-
-function budgetTotal(day: DayPlan) {
-  return Object.values(day.budget).reduce((sum, value) => sum + value, 0);
-}
-
-function allBudgetTotals(itinerary: Itinerary) {
-  return itinerary.days.reduce<Record<string, number>>((totals, day) => {
-    Object.entries(day.budget).forEach(([key, value]) => {
-      totals[key] = (totals[key] ?? 0) + value;
-    });
-    return totals;
-  }, {});
-}
+type OutputPageId = "cover" | number;
 
 function PrintPage({
   itinerary,
@@ -71,15 +58,13 @@ function PrintPage({
 }
 
 function CoverPage({ itinerary, totalPages }: { itinerary: Itinerary; totalPages: number }) {
-  const grandTotal = itinerary.days.reduce((sum, day) => sum + budgetTotal(day), 0);
-
   return (
     <PrintPage itinerary={itinerary} pageNum={1} total={totalPages}>
       <div className="text-center mb-8">
         <WImgBox className="w-full h-40 mb-6 rounded-lg" label={`封面 · ${itinerary.destination}`} />
         <h1 className="text-3xl font-bold text-slate-950 mb-2 leading-tight">{itinerary.title}</h1>
         <p className="text-sm font-mono text-slate-500 mb-5">
-          {itinerary.dateRange} · 成人 {itinerary.travelers} 人 · 预算约 ¥{grandTotal}
+          {itinerary.dateRange} · 成人 {itinerary.travelers} 人
         </p>
         <div className="flex justify-center gap-3 mb-8">
           {itinerary.interests.map((tag) => (
@@ -93,12 +78,11 @@ function CoverPage({ itinerary, totalPages }: { itinerary: Itinerary; totalPages
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-3 gap-4 mb-8">
         {[
           ["目的地", itinerary.destination],
           ["出行天数", `${itinerary.days.length} 天`],
           ["旅行人数", `${itinerary.travelers} 人`],
-          ["总预算", `¥ ${grandTotal}`],
         ].map(([key, value]) => (
           <div key={key} className="border border-slate-200 rounded-lg p-4 text-center">
             <p className="text-[10px] font-mono text-slate-400 mb-1 uppercase tracking-widest">{key}</p>
@@ -114,7 +98,6 @@ function CoverPage({ itinerary, totalPages }: { itinerary: Itinerary; totalPages
           <span className="text-xs font-mono text-slate-400 w-16 shrink-0">{day.date}</span>
           <span className="text-sm text-slate-800 flex-1">{day.title}</span>
           <span className="text-sm">{day.weather.icon}</span>
-          <span className="text-xs font-mono text-slate-500">¥ {budgetTotal(day)}</span>
         </div>
       ))}
     </PrintPage>
@@ -132,8 +115,6 @@ function DayOutputPage({
   pageNum: number;
   totalPages: number;
 }) {
-  const dayTotal = budgetTotal(day);
-
   return (
     <PrintPage itinerary={itinerary} pageNum={pageNum} total={totalPages}>
       <div className="flex items-end justify-between mb-6 pb-4 border-b border-slate-200">
@@ -211,74 +192,8 @@ function DayOutputPage({
               {day.weather.tip ?? "天气适宜，注意合理安排体力。"}
             </p>
           </div>
-
-          <div>
-            <p className="text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-2">当日预算</p>
-            {Object.entries(day.budget).map(([key, value]) => (
-              <div key={key} className="mb-1">
-                <div className="flex justify-between text-[10px] font-mono text-slate-600 mb-0.5">
-                  <span>{key}</span>
-                  <span>¥ {value}</span>
-                </div>
-                <div className="h-1.5 rounded-full bg-slate-100">
-                  <div
-                    className="h-full rounded-full bg-sky-500"
-                    style={{ width: `${Math.round((value / dayTotal) * 100)}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-            <div className="flex justify-between text-[11px] font-mono font-bold text-slate-800 mt-1.5 pt-1.5 border-t border-slate-300">
-              <span>合计</span>
-              <span>¥ {dayTotal}</span>
-            </div>
-          </div>
         </div>
       </div>
-    </PrintPage>
-  );
-}
-
-function BudgetPage({ itinerary, pageNum, totalPages }: { itinerary: Itinerary; pageNum: number; totalPages: number }) {
-  const totals = allBudgetTotals(itinerary);
-  const grandTotal = Object.values(totals).reduce((sum, value) => sum + value, 0);
-
-  return (
-    <PrintPage itinerary={itinerary} pageNum={pageNum} total={totalPages}>
-      <div className="text-center mb-8 pb-6 border-b border-slate-200">
-        <h2 className="text-2xl font-bold text-slate-950 mb-1">预算总表</h2>
-        <p className="text-sm font-mono text-slate-500">{itinerary.title}</p>
-      </div>
-      <table className="w-full font-mono border-collapse mb-8">
-        <thead>
-          <tr className="border-b-2 border-slate-900">
-            {["类别", "金额（¥）", "占比", "备注"].map((header) => (
-              <th key={header} className="py-2 px-3 text-left text-xs text-slate-700 font-bold">
-                {header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {Object.entries(totals).map(([key, value], index) => (
-            <tr key={key} className={index % 2 === 0 ? "bg-slate-50" : "bg-white"}>
-              <td className="py-2.5 px-3 text-sm text-slate-700 border-b border-slate-100">{key}</td>
-              <td className="py-2.5 px-3 text-sm text-slate-700 border-b border-slate-100">{value}</td>
-              <td className="py-2.5 px-3 text-sm text-slate-700 border-b border-slate-100">
-                {Math.round((value / grandTotal) * 100)}%
-              </td>
-              <td className="py-2.5 px-3 text-sm text-slate-400 border-b border-slate-100">按每日预算汇总</td>
-            </tr>
-          ))}
-          <tr className="border-t-2 border-slate-900">
-            <td className="py-3 px-3 text-sm font-bold text-slate-900">合计</td>
-            <td className="py-3 px-3 text-sm font-bold text-slate-900">¥ {grandTotal}</td>
-            <td className="py-3 px-3 text-sm text-slate-500">100%</td>
-            <td className="py-3 px-3 text-sm text-slate-400">仅供参考</td>
-          </tr>
-        </tbody>
-      </table>
-      <p className="text-center text-[10px] font-mono text-slate-400">以上费用仅供参考，实际价格以当地为准</p>
     </PrintPage>
   );
 }
@@ -323,7 +238,6 @@ export function PageOutput({ tripId, onBack }: { tripId: string; onBack: () => v
     return [
       { id: "cover" as const, label: "封面总览", sub: "行程概要" },
       ...itinerary.days.map((day, index) => ({ id: index, label: `第${day.day}天`, sub: day.date })),
-      { id: "budget" as const, label: "预算总表", sub: "费用明细" },
     ];
   }, [itinerary]);
 
@@ -430,7 +344,6 @@ export function PageOutput({ tripId, onBack }: { tripId: string; onBack: () => v
             totalPages={totalPages}
           />
         )}
-        {activePage === "budget" && <BudgetPage itinerary={itinerary} pageNum={totalPages} totalPages={totalPages} />}
       </div>
     </div>
   );

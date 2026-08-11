@@ -28,7 +28,6 @@ export type DayPlan = {
     lunch: { time: string; area: string; suggestion: string; nearbyPlace?: string; reason?: string };
     dinner: { time: string; area: string; suggestion: string; nearbyPlace?: string; reason?: string };
   };
-  budget: { 交通: number; 餐饮: number; 门票: number; 其他: number };
   route: { distanceKm: number; walkKm: number; transitKm: number; durationLabel: string };
   items: ItineraryItem[];
 };

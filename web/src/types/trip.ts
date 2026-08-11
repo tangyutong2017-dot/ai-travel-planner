@@ -47,10 +47,6 @@ export type CreateTripPayload = {
   endDate: string;
   days: number;
   travelers: TravelersPayload;
-  budget: {
-    min: number;
-    max: number;
-  };
   preferences: {
     interests: string[];
     pace: number;

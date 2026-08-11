@@ -37,7 +37,6 @@ def create_placeholder_itinerary(trip_id: str, payload: CreateTripPayload) -> It
                 "date": f"第 {day} 天",
                 "title": f"{payload.destination} Day {day}",
                 "weather": {"icon": "☀️", "desc": "待查询", "range": "--", "tip": "天气数据将在后端接入后实时更新"},
-                "budget": {"交通": 0, "餐饮": 0, "门票": 0, "其他": 0},
                 "route": {"distanceKm": 0, "walkKm": 0, "transitKm": 0, "durationLabel": "待规划"},
                 "items": [
                     {
@@ -107,7 +106,6 @@ def create_seed_itinerary(trip: Trip) -> Itinerary:
                 "date": f"第 {day} 天",
                 "title": f"{trip.dest} Day {day}",
                 "weather": {"icon": "☀️", "desc": "待查询", "range": "--", "tip": "真实天气将在后端接天气 API 后返回"},
-                "budget": {"交通": 180, "餐饮": 260, "门票": 120, "其他": 80},
                 "route": {"distanceKm": 8.4, "walkKm": 2.1, "transitKm": 6.3, "durationLabel": "~7h"},
                 "items": [
                     {

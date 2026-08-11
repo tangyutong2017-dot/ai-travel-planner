@@ -63,7 +63,7 @@ type Trip = {
 
 接口：`GET /api/trips/:tripId`
 
-用途：进入行程工作区时获取完整行程详情。前端会用这些数据渲染左侧天数、中心时间轴、右侧地图/天气/预算/备注。
+用途：进入行程工作区时获取完整行程详情。前端会用这些数据渲染左侧天数、中心时间轴、右侧地图/天气/备注。
 
 返回：
 
@@ -87,12 +87,6 @@ type DayPlan = {
     desc: string
     range: string
     tip?: string
-  }
-  budget: {
-    交通: number
-    餐饮: number
-    门票: number
-    其他: number
   }
   route: {
     distanceKm: number
@@ -134,11 +128,6 @@ type CreateTripPayload = {
     adults: number
     children: number
     infants: number
-  }
-  budget: {
-    min: number
-    max: number
-    level: '经济型' | '舒适型' | '豪华型'
   }
   preferences: {
     interests: string[]
@@ -192,3 +181,14 @@ type AgentJob = {
   message: string
 }
 ```
+
+
+## 已移除：预算
+
+`CreateTripPayload.budget` 与 `DayPlan.budget` 已于 2026-08-11 移除。
+
+原因：高德 POI 的 `cost` 字段覆盖率低，餐饮与交通费用没有可靠数据源，
+加总出的"总预算"实为估算，可信度不足以支撑一个独立的输出页。
+
+保留的是**单个景点的真实门票价**（`ItineraryItem.cost`，来自高德），
+在景点卡片上如实展示"免费 / ¥80"，但不做任何加总与超支校验。

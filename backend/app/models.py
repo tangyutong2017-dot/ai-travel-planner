@@ -25,11 +25,6 @@ class Travelers(BaseModel):
         return self
 
 
-class BudgetPreference(BaseModel):
-    min: int = Field(ge=0)
-    max: int = Field(ge=0)
-
-
 class TripPreferences(BaseModel):
     interests: list[str]
     pace: int = Field(ge=1, le=100)
@@ -44,7 +39,6 @@ class CreateTripPayload(BaseModel):
     endDate: str
     days: int = Field(ge=1, le=60)
     travelers: Travelers
-    budget: BudgetPreference
     preferences: TripPreferences
 
 
@@ -151,7 +145,6 @@ class DayPlan(BaseModel):
     generationStatus: DayGenerationStatus = "finalized"
     weather: DayWeather
     mealSuggestions: DayMealSuggestions | None = None
-    budget: dict[str, int]
     route: DayRoute
     items: list[ItineraryItem]
 
