@@ -263,7 +263,7 @@ def create_trip(db: Session, payload: CreateTripPayload) -> Trip:
 
 def get_itinerary(db: Session, trip_id: str) -> Itinerary | None:
     record = db.get(ItineraryRecord, trip_id)
-    if not record or is_placeholder_itinerary(record.days_json):
+    if not record:
         return None
 
     if fill_missing_poi_data(record):
@@ -274,30 +274,6 @@ def get_itinerary(db: Session, trip_id: str) -> Itinerary | None:
         db.refresh(record)
 
     return itinerary_from_record(record)
-
-
-def is_placeholder_itinerary(days: list) -> bool:
-    if not days:
-        return False
-
-    placeholder_items = 0
-    total_items = 0
-    for day in days:
-        if not isinstance(day, dict):
-            continue
-
-        for item in day.get("items", []):
-            if not isinstance(item, dict):
-                continue
-
-            total_items += 1
-            title = str(item.get("title") or "")
-            reason = str(item.get("reason") or "")
-            item_id = str(item.get("id") or "")
-            if "围绕「" in title or "后端占位数据" in reason or item_id.endswith("_seed"):
-                placeholder_items += 1
-
-    return total_items > 0 and placeholder_items == total_items
 
 
 def fill_missing_poi_data(record: ItineraryRecord) -> bool:
