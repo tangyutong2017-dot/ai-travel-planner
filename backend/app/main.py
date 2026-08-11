@@ -44,6 +44,20 @@ def startup() -> None:
         db.close()
 
 
+@app.get("/")
+def root() -> dict[str, str]:
+    """根路径原本没有路由，直接访问会返回 404「Not Found」，看起来像服务挂了。
+
+    这里给出一句指路：这是 API 服务，前端在另一个端口。
+    """
+    return {
+        "service": "Travel Planner API",
+        "docs": "/docs",
+        "health": "/health",
+        "web": "前端开发服务器在 http://localhost:5173",
+    }
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
