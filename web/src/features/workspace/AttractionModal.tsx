@@ -1,0 +1,109 @@
+import { Divider, WAnnotation, WBtn, WImgBox } from "../../components/ui/Primitives";
+import type { ItineraryItem } from "../../types/itinerary";
+
+export function ModalAttraction({ item, onClose }: { item: ItineraryItem; onClose: () => void }) {
+  const detailRows = [
+    ["游览时间", `${item.startTime} - ${item.endTime}`],
+    ["建议停留", item.durationLabel],
+    ["费用", item.cost === 0 ? "免费" : `¥${item.cost}`],
+    ["地址", item.address || "暂无地址"],
+    ["交通", item.transitFromPrev || "首站 / 暂无上一站交通"],
+    ["坐标", item.location ? `${item.location.lat}, ${item.location.lng}` : "暂无坐标"],
+    ["来源", item.source === "amap" ? "高德 POI" : item.source === "deepseek" ? "DeepSeek" : "系统生成"],
+  ];
+
+  return (
+    <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-50" onClick={onClose}>
+      <div
+        className="w-[680px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/20"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
+          <div>
+            <WAnnotation text="景点详情" />
+            <h2 className="text-base font-bold text-slate-900">{item.title}</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-lg font-mono text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="p-5">
+          <div className="flex gap-4 mb-4">
+            {item.imageUrl ? (
+              <img
+                className="h-36 w-52 shrink-0 rounded-lg object-cover"
+                src={item.imageUrl}
+                alt={`${item.title} 主图`}
+              />
+            ) : (
+              <WImgBox className="w-52 h-36 shrink-0 rounded-lg" label="景点主图" />
+            )}
+            <div className="flex-1">
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {[item.type, item.source === "amap" ? "高德验证" : "AI生成", item.poiId ? "POI" : "未匹配POI"].map(
+                  (tag) => (
+                    <span
+                      key={tag}
+                      className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-mono text-slate-600"
+                    >
+                      {tag}
+                    </span>
+                  ),
+                )}
+              </div>
+              <div className="space-y-1.5">
+                {detailRows.map(([key, value]) => (
+                  <div key={key} className="flex gap-2 text-xs font-mono">
+                    <span className="text-slate-400 w-20 shrink-0">{key}</span>
+                    <span className="text-slate-700">{value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <p className="text-xs font-semibold text-slate-700 mb-1">推荐理由</p>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs text-slate-600 leading-relaxed">
+                {item.reason || "暂无推荐理由。后续可由 Editing Agent 或景点详情服务补充更完整介绍。"}
+              </p>
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <p className="text-xs font-semibold text-slate-700 mb-1">数据状态</p>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                ["图片", item.imageUrl ? "已获取" : "暂无"],
+                ["坐标", item.location ? "已获取" : "暂无"],
+                ["POI", item.poiId ? item.poiId : "暂无"],
+              ].map(([key, value]) => (
+                <div key={key} className="rounded-lg border border-slate-200 bg-white p-2">
+                  <p className="text-[10px] font-mono text-slate-400">{key}</p>
+                  <p className="mt-0.5 truncate text-xs font-medium text-slate-700">{value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <Divider className="mb-4" />
+          <div className="flex gap-2 justify-end">
+            <WBtn
+              label="复制位置"
+              small
+              onClick={() => {
+                if (item.location) void navigator.clipboard?.writeText(`${item.location.lat},${item.location.lng}`);
+              }}
+            />
+            <WBtn label="✓ 已在行程中" primary small />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
