@@ -26,11 +26,15 @@ def trip_from_record(record: TripRecord) -> Trip:
 def itinerary_from_record(record: ItineraryRecord) -> Itinerary:
     return Itinerary(
         tripId=record.trip_id,
-        destination=record.destination,
         title=record.title,
         dateRange=record.date_range,
-        travelers=record.travelers,
+        originCity=record.origin_city,
+        destination=record.destination,
+        route=record.route_json or [record.destination],
+        travelers=record.travelers_json,
         interests=record.interests_json,
+        notes=record.notes_json or [],
+        bookings=record.bookings_json or [],
         days=record.days_json,
     )
 
@@ -45,17 +49,18 @@ def job_from_record(record: AgentJobRecord) -> AgentJob:
     )
 
 
+# 「主要景点」= 景点与活动。原先靠 countsAsMajorPlace 布尔位标记，
+# 现在由 stopType 直接推导，少一个可能与类型矛盾的字段。
+MAJOR_STOP_TYPES = {"sight", "activity"}
+
+
 def count_major_itinerary_items(days: list) -> int:
     total = 0
     for day in days:
         items = getattr(day, "items", []) if not isinstance(day, dict) else day.get("items", [])
         for item in items:
-            if isinstance(item, dict):
-                if item.get("countsAsMajorPlace", True) and not item.get("mealType"):
-                    total += 1
-                continue
-
-            if item.countsAsMajorPlace and not item.mealType:
+            stop_type = item.get("stopType") if isinstance(item, dict) else item.stopType
+            if stop_type in MAJOR_STOP_TYPES:
                 total += 1
 
     return total

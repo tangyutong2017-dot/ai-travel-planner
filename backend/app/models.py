@@ -109,40 +109,53 @@ class TripListResponse(BaseModel):
     summary: TripListSummary
 
 
+# 条目类型。取代原先的自由字符串 type——枚举才能让 UI 决定图标、让校验器区分条目。
+# 后四种让城际交通与住宿成为时间轴上的条目，从而参与时间闭合计算。
+StopType = Literal["sight", "food", "activity", "rest", "flight", "train", "transfer", "hotel"]
+
+# 体力强度。与输入侧的 activityLevel 配对，低体力用户不应排入 high 项。
+Intensity = Literal["low", "mid", "high"]
+
+BookingUrgency = Literal["high", "mid", "low"]
+
+# AI 说明。assumption 允许用户纠正，alert 只读。
+NoteKind = Literal["assumption", "alert"]
+
+# 印证状态。verified = 高德精确匹配；unverified = 匹配可疑，保留名称但不给坐标；
+# manual = 用户手工添加或改过；placeholder = agent 未接入时的占位条目。
+Verification = Literal["verified", "unverified", "manual", "placeholder"]
+
+
 class ItineraryItem(BaseModel):
     id: str
-    startTime: str
-    endTime: str
     title: str
-    type: str
-    durationLabel: str
-    cost: int
+    stopType: StopType
+    startTime: str
+    # 时长与通勤都存分钟数：校验器无法从 "2h" / "地铁 15 分钟" 这类展示文本算时间闭合。
+    # endTime 与 durationLabel 均可由此派生，不再单独存储。
+    durationMin: int = Field(ge=0)
+    cost: int = 0
+    optional: bool = False
+    intensity: Intensity | None = None
+    bookRequired: bool = False
+    verification: Verification = "unverified"
     reason: str | None = None
-    transitFromPrev: str | None = None
+    transitMinutes: int | None = None
+    transitMode: LocalTransport | None = None
     address: str | None = None
     location: dict[str, float] | None = None
     poiId: str | None = None
-    source: str | None = None
     imageUrl: str | None = None
     mealType: str | None = None
-    countsAsMajorPlace: bool = True
 
 
 class UpdateItineraryItemPayload(BaseModel):
     title: str | None = None
     startTime: str | None = None
-    endTime: str | None = None
-    type: str | None = None
-    durationLabel: str | None = None
+    durationMin: int | None = Field(default=None, ge=0)
+    stopType: StopType | None = None
     cost: int | None = Field(default=None, ge=0)
     reason: str | None = None
-
-
-class DayRoute(BaseModel):
-    distanceKm: float
-    walkKm: float
-    transitKm: float
-    durationLabel: str
 
 
 class DayWeather(BaseModel):
@@ -152,38 +165,55 @@ class DayWeather(BaseModel):
     tip: str | None = None
 
 
-class MealSuggestion(BaseModel):
-    time: str
+class Stay(BaseModel):
+    """当晚住宿片区。不推荐具体酒店——无法验证空房与价格。
+
+    city 由所属 DayPlan.city 继承，不重复存储。
+    """
+
     area: str
-    suggestion: str
-    nearbyPlace: str | None = None
+    location: dict[str, float] | None = None
     reason: str | None = None
-
-
-class DayMealSuggestions(BaseModel):
-    breakfast: MealSuggestion
-    lunch: MealSuggestion
-    dinner: MealSuggestion
 
 
 class DayPlan(BaseModel):
     day: int
     date: str
+    city: str
     title: str
     generationStatus: DayGenerationStatus = "finalized"
     weather: DayWeather
-    mealSuggestions: DayMealSuggestions | None = None
-    route: DayRoute
+    stay: Stay | None = None
     items: list[ItineraryItem]
+
+
+class Booking(BaseModel):
+    """预订待办。名称与所需信息从 itemId 指向的条目取，不重复存储。"""
+
+    itemId: str
+    channel: str
+    leadTimeDays: int | None = Field(default=None, ge=0)
+    urgency: BookingUrgency | None = None
+    note: str | None = None
+
+
+class PlanNote(BaseModel):
+    kind: NoteKind
+    text: str
 
 
 class Itinerary(BaseModel):
     tripId: str
-    destination: str
     title: str
     dateRange: str
-    travelers: int
+    originCity: str
+    # route 是有序途经城市；destination 是它的展示摘要，保留是因为列表页与标题栏都在用
+    destination: str
+    route: list[str] = Field(default_factory=list)
+    travelers: Travelers
     interests: list[str]
+    notes: list[PlanNote] = Field(default_factory=list)
+    bookings: list[Booking] = Field(default_factory=list)
     days: list[DayPlan]
 
 

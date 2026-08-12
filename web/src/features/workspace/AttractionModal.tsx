@@ -1,15 +1,23 @@
 import { Divider, WAnnotation, WBtn, WImgBox } from "../../components/ui/Primitives";
 import type { ItineraryItem } from "../../types/itinerary";
+import { STOP_TYPE_LABELS, endTimeOf, formatDuration } from "../../types/itinerary";
 
 export function ModalAttraction({ item, onClose }: { item: ItineraryItem; onClose: () => void }) {
+  const VERIFICATION_LABELS: Record<string, string> = {
+    verified: "高德已核实",
+    unverified: "未核实",
+    manual: "手动添加",
+    placeholder: "占位数据",
+  };
+
   const detailRows = [
-    ["游览时间", `${item.startTime} - ${item.endTime}`],
-    ["建议停留", item.durationLabel],
+    ["游览时间", `${item.startTime} - ${endTimeOf(item.startTime, item.durationMin)}`],
+    ["建议停留", formatDuration(item.durationMin)],
     ["费用", item.cost === 0 ? "免费" : `¥${item.cost}`],
     ["地址", item.address || "暂无地址"],
-    ["交通", item.transitFromPrev || "首站 / 暂无上一站交通"],
+    ["上一站交通", item.transitMinutes ? `${item.transitMinutes} 分钟` : "首站 / 暂无"],
     ["坐标", item.location ? `${item.location.lat}, ${item.location.lng}` : "暂无坐标"],
-    ["来源", item.source === "amap" ? "高德 POI" : item.source === "deepseek" ? "DeepSeek" : "系统生成"],
+    ["核实状态", VERIFICATION_LABELS[item.verification ?? "unverified"]],
   ];
 
   return (
@@ -44,16 +52,18 @@ export function ModalAttraction({ item, onClose }: { item: ItineraryItem; onClos
             )}
             <div className="flex-1">
               <div className="flex flex-wrap gap-1.5 mb-3">
-                {[item.type, item.source === "amap" ? "高德验证" : "AI生成", item.poiId ? "POI" : "未匹配POI"].map(
-                  (tag) => (
-                    <span
-                      key={tag}
-                      className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-mono text-slate-600"
-                    >
-                      {tag}
-                    </span>
-                  ),
-                )}
+                {[
+                  STOP_TYPE_LABELS[item.stopType],
+                  VERIFICATION_LABELS[item.verification ?? "unverified"],
+                  item.poiId ? "POI" : "未匹配POI",
+                ].map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-mono text-slate-600"
+                  >
+                    {tag}
+                  </span>
+                ))}
               </div>
               <div className="space-y-1.5">
                 {detailRows.map(([key, value]) => (

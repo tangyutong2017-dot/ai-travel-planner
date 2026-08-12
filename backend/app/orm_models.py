@@ -35,11 +35,15 @@ class ItineraryRecord(Base):
     __tablename__ = "itineraries"
 
     trip_id: Mapped[str] = mapped_column(ForeignKey("trips.id", ondelete="CASCADE"), primary_key=True)
+    origin_city: Mapped[str] = mapped_column(String(255), default="")
     destination: Mapped[str] = mapped_column(String(255))
     title: Mapped[str] = mapped_column(String(255))
     date_range: Mapped[str] = mapped_column(String(120))
-    travelers: Mapped[int] = mapped_column(Integer)
+    travelers_json: Mapped[dict] = mapped_column(JSONB)
+    route_json: Mapped[list] = mapped_column(JSONB, default=list)
     interests_json: Mapped[list] = mapped_column(JSONB)
+    notes_json: Mapped[list] = mapped_column(JSONB, default=list)
+    bookings_json: Mapped[list] = mapped_column(JSONB, default=list)
     days_json: Mapped[list] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)

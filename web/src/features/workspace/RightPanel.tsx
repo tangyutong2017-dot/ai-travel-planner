@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { WAnnotation, WBtn } from "../../components/ui/Primitives";
 import type { DayPlan, ItineraryItem } from "../../types/itinerary";
+import { formatDuration } from "../../types/itinerary";
 
 function CollapsibleSection({
   title,
@@ -99,7 +100,8 @@ function RouteMiniMap({ day }: { day: DayPlan }) {
 }
 
 export function RightPanel({ day, onOutput }: { day: DayPlan; onOutput: () => void }) {
-  const formatKm = (value: number) => `${Number(value.toFixed(1))} km`;
+  const totalTransitMinutes = day.items.reduce((sum, item) => sum + (item.transitMinutes ?? 0), 0);
+  const totalStayMinutes = day.items.reduce((sum, item) => sum + item.durationMin, 0);
   const dataStats = [
     ["POI", day.items.filter((item) => item.poiId).length],
     ["坐标", day.items.filter((item) => item.location).length],
@@ -114,11 +116,10 @@ export function RightPanel({ day, onOutput }: { day: DayPlan; onOutput: () => vo
       <CollapsibleSection title="地图预览" badge="路线" defaultOpen={true}>
         <RouteMiniMap day={day} />
         <div className="mt-2 space-y-0.5">
+          {/* DayRoute 汇总字段已删除——由条目上的 transitMinutes 直接求和，避免两份数据不一致 */}
           {[
-            ["总距离", formatKm(day.route.distanceKm)],
-            ["步行", formatKm(day.route.walkKm)],
-            ["交通", formatKm(day.route.transitKm)],
-            ["耗时", day.route.durationLabel],
+            ["通勤合计", totalTransitMinutes ? `${totalTransitMinutes} 分钟` : "待规划"],
+            ["停留合计", formatDuration(totalStayMinutes)],
           ].map(([key, value]) => (
             <div key={key} className="flex justify-between text-[10px] font-mono text-slate-500">
               <span>{key}</span>
@@ -136,6 +137,17 @@ export function RightPanel({ day, onOutput }: { day: DayPlan; onOutput: () => vo
           <p className="text-[10px] font-mono text-slate-400">{day.weather.range}</p>
         </div>
         {day.weather.tip && <p className="text-[10px] font-mono text-slate-400 mt-2">{day.weather.tip}</p>}
+      </CollapsibleSection>
+
+      <CollapsibleSection title="住宿片区" badge={day.stay ? day.city : "未安排"} defaultOpen={false}>
+        {day.stay ? (
+          <div className="space-y-1">
+            <p className="text-[11px] font-medium text-slate-700">{day.stay.area}</p>
+            {day.stay.reason && <p className="text-[10px] font-mono text-slate-500">{day.stay.reason}</p>}
+          </div>
+        ) : (
+          <p className="text-[10px] font-mono text-slate-400">当晚无住宿安排（返程日或尚未规划）</p>
+        )}
       </CollapsibleSection>
 
       <CollapsibleSection title="数据质量" badge={`${day.items.length} 项`} defaultOpen={false}>

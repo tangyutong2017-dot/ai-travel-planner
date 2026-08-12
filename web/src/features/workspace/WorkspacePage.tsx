@@ -9,29 +9,22 @@ import {
 import { ApiError } from "../../api/client";
 import { getJobStatus } from "../../api/jobs";
 import { WAnnotation, WBtn, WImgBox } from "../../components/ui/Primitives";
-import type { Itinerary, ItineraryItem } from "../../types/itinerary";
+import type { Itinerary, ItineraryItem, StopType } from "../../types/itinerary";
+import { STOP_TYPE_LABELS } from "../../types/itinerary";
+import { LOCAL_TRANSPORT_LABELS } from "../../types/trip";
 import { AttractionCard } from "./AttractionCard";
 import { RightPanel } from "./RightPanel";
 
 function hasPendingGeneratedDays(itinerary: Itinerary | null) {
   if (!itinerary) return false;
 
-  return itinerary.days.some((day) =>
-    day.items.some(
-      (item) =>
-        item.type === "AI规划" ||
-        item.reason?.includes("占位数据") ||
-        item.reason?.includes("下一步由 LangGraph agent"),
-    ),
-  );
+  return itinerary.days.some((day) => day.items.some((item) => item.verification === "placeholder"));
 }
 
 type EditingItemState = {
   day: number;
   item: ItineraryItem;
-  form: Required<
-    Pick<UpdateTripItemPayload, "title" | "startTime" | "endTime" | "type" | "durationLabel" | "cost" | "reason">
-  >;
+  form: Required<Pick<UpdateTripItemPayload, "title" | "startTime" | "durationMin" | "stopType" | "cost" | "reason">>;
 };
 
 export function PageWorkspace({
@@ -209,9 +202,8 @@ export function PageWorkspace({
       form: {
         title: item.title,
         startTime: item.startTime,
-        endTime: item.endTime,
-        type: item.type,
-        durationLabel: item.durationLabel,
+        durationMin: item.durationMin,
+        stopType: item.stopType,
         cost: item.cost,
         reason: item.reason ?? "",
       },
@@ -330,12 +322,14 @@ export function PageWorkspace({
                 {index < day.items.length - 1 && <div className="w-0.5 flex-1 bg-sky-100 my-1" />}
               </div>
               <div className="flex-1">
-                {item.transitFromPrev && (
+                {item.transitMinutes != null && (
                   <div className="flex items-center gap-2 mb-2 ml-2">
                     <div className="w-3 h-3 rounded bg-slate-200 flex items-center justify-center">
                       <div className="w-1.5 h-1.5 rounded bg-sky-500" />
                     </div>
-                    <span className="text-[10px] font-mono text-slate-400">{item.transitFromPrev}</span>
+                    <span className="text-[10px] font-mono text-slate-400">
+                      {item.transitMode ? LOCAL_TRANSPORT_LABELS[item.transitMode] : "移动"} {item.transitMinutes} 分钟
+                    </span>
                   </div>
                 )}
                 <AttractionCard
@@ -399,20 +393,28 @@ export function PageWorkspace({
                 />
               </label>
               <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
-                结束时间
+                停留时长（分钟）
                 <input
-                  value={editingItem.form.endTime}
-                  onChange={(event) => patchEditingForm({ endTime: event.target.value })}
+                  type="number"
+                  min={0}
+                  value={editingItem.form.durationMin}
+                  onChange={(event) => patchEditingForm({ durationMin: Number(event.target.value) })}
                   className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-sky-400"
                 />
               </label>
               <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
                 类型
-                <input
-                  value={editingItem.form.type}
-                  onChange={(event) => patchEditingForm({ type: event.target.value })}
+                <select
+                  value={editingItem.form.stopType}
+                  onChange={(event) => patchEditingForm({ stopType: event.target.value as StopType })}
                   className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-sky-400"
-                />
+                >
+                  {(Object.entries(STOP_TYPE_LABELS) as [StopType, string][]).map(([key, label]) => (
+                    <option key={key} value={key}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
                 费用

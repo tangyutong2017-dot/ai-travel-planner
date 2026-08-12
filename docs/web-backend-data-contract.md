@@ -225,3 +225,47 @@ type AgentJob = {
 - `preferences.accommodation`（酒店/民宿/青旅/度假村/精品酒店）：全后端零引用。
   产品只输出「建议住宿片区」而不推荐具体酒店，住宿类型不改变任何输出，
   其意图已由 `comfortLevel` 覆盖。
+
+
+## 输出层改版（2026-08-12）
+
+参考一份实际使用中验证过的行程 JSON schema，重做输出结构。
+
+### 新增
+
+| 字段 | 作用 |
+|---|---|
+| `Itinerary.originCity` / `route[]` | `route` 是有序途经城市，支撑大理→丽江→香格里拉这类多城市行程；`destination` 保留为展示摘要 |
+| `Itinerary.notes[]` | `kind: assumption \| alert`。assumption 是 AI 对 customText 的推断（允许用户纠正），alert 是安全/季节提醒 |
+| `Itinerary.bookings[]` | 预订待办，含 `leadTimeDays` 与 `urgency`，可做倒计时 |
+| `DayPlan.city` / `DayPlan.stay` | 每天所在城市与当晚住宿片区（返程日为 null） |
+| `ItineraryItem.stopType` | 枚举 `sight/food/activity/rest/flight/train/transfer/hotel`。后四种让城际交通与住宿成为时间轴条目，从而参与时间闭合计算 |
+| `ItineraryItem.durationMin` / `transitMinutes` / `transitMode` | 分钟数。校验器无法从 `"2h"`、`"地铁 15 分钟"` 这类展示文本计算时间闭合 |
+| `ItineraryItem.optional` | 时间超限时优先砍掉的条目，比等比压缩所有时长更接近真实取舍 |
+| `ItineraryItem.intensity` | 与输入侧 `activityLevel` 配对，低体力用户不应排入 high 项 |
+| `ItineraryItem.bookRequired` | 卡片角标；渠道与提前量存在 `bookings[]`，不重复存储 |
+| `ItineraryItem.verification` | `verified/unverified/manual/placeholder`，取代原先的裸 `source` |
+
+### 删除（均为可由其他字段推导或重复存储）
+
+| 删除 | 取代者 |
+|---|---|
+| `ItineraryItem.endTime` | `startTime + durationMin` |
+| `ItineraryItem.durationLabel` | 由 `durationMin` 格式化，前端 `formatDuration()` |
+| `ItineraryItem.type`（自由字符串） | `stopType` 枚举 + 中文标签映射 |
+| `ItineraryItem.countsAsMajorPlace` | 由 `stopType in (sight, activity)` 推导 |
+| `ItineraryItem.transitFromPrev`（文本） | `transitMinutes` + `transitMode` |
+| `ItineraryItem.source` | `verification` |
+| `DayPlan.route`（当日距离/耗时汇总） | 由各条目 `transitMinutes` / `durationMin` 求和 |
+| `DayPlan.mealSuggestions` | 三餐并入 `items`（`stopType="food"` + `mealType`） |
+
+### 修改
+
+- `Itinerary.travelers`：`int` → `{adults, children, infants}`。原先只存总数，
+  输出页却渲染成「成人 N 人」，2 大 1 小会显示「成人 3 人」。
+
+### 数据库
+
+`itineraries` 表新增 `origin_city` / `route_json` / `notes_json` / `bookings_json`，
+`travelers` 整数列改为 `travelers_json`。项目未接入 Alembic，`create_all` 只建表不改表，
+因此本次直接删表重建，原有测试数据一并清除。

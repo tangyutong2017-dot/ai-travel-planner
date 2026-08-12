@@ -19,9 +19,14 @@ PLACEHOLDER_SOURCE = "placeholder"
 def is_placeholder_item(item: dict) -> bool:
     """占位条目没有真实景点名，不能拿去高德搜索。
 
-    新数据靠 source 标记识别；`_seed` 后缀是给标记落地之前的历史数据兜底。
+    靠 verification 标记识别；`source` 是旧字段、`_seed` 后缀是更早的历史数据，
+    两者都保留作兜底。
     """
-    return item.get("source") == PLACEHOLDER_SOURCE or str(item.get("id") or "").endswith("_seed")
+    return (
+        item.get("verification") == PLACEHOLDER_SOURCE
+        or item.get("source") == PLACEHOLDER_SOURCE
+        or str(item.get("id") or "").endswith("_seed")
+    )
 
 
 def get_itinerary(db: Session, trip_id: str) -> Itinerary | None:
@@ -69,7 +74,7 @@ def fill_missing_poi_data(record: ItineraryRecord) -> bool:
             item["address"] = poi.address
             item["location"] = {"lat": poi.lat, "lng": poi.lng}
             item["poiId"] = poi.id
-            item["source"] = "amap"
+            item["verification"] = "verified"
             item["imageUrl"] = item.get("imageUrl") or poi.image_url
             changed = True
 
@@ -151,11 +156,15 @@ def update_itinerary_item(
 def save_itinerary(db: Session, trip_id: str, itinerary: Itinerary, commit: bool = True) -> None:
     record = db.get(ItineraryRecord, trip_id)
     payload = {
+        "origin_city": itinerary.originCity,
         "destination": itinerary.destination,
         "title": itinerary.title,
         "date_range": itinerary.dateRange,
-        "travelers": itinerary.travelers,
+        "travelers_json": itinerary.travelers.model_dump(),
+        "route_json": itinerary.route,
         "interests_json": itinerary.interests,
+        "notes_json": [note.model_dump() for note in itinerary.notes],
+        "bookings_json": [booking.model_dump() for booking in itinerary.bookings],
         "days_json": [day.model_dump() for day in itinerary.days],
     }
 

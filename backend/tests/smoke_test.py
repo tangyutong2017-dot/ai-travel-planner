@@ -70,16 +70,19 @@ check("任务返回进度与文案", bool(final) and final.get("progress") == 10
 s, detail = call("GET", f"/api/trips/{trip}")
 check("生成后可取详情", s == 200, f"{s} {detail}")
 check("天数与创建请求一致", s == 200 and len(detail.get("days", [])) == 3, str(len(detail.get("days", []))))
+for field in ("originCity", "route", "travelers", "notes", "bookings"):
+    check(f"Itinerary 含 {field}", field in detail)
+check("travelers 为结构而非总数", isinstance(detail.get("travelers"), dict), str(detail.get("travelers")))
 d1 = detail["days"][0] if s == 200 and detail.get("days") else {}
-for field in ("day", "date", "title", "weather", "route", "items"):
+for field in ("day", "date", "city", "title", "weather", "stay", "items"):
     check(f"DayPlan 含 {field}", field in d1)
 it = d1.get("items", [{}])[0]
-for field in ("id", "startTime", "endTime", "title", "type", "durationLabel", "cost"):
+for field in ("id", "title", "stopType", "startTime", "durationMin", "cost", "verification"):
     check(f"ItineraryItem 含 {field}", field in it)
 
 # --- 手动编辑：改景点 (PRD 8.5 手动编辑) ---
 s, d = call("PATCH", f"/api/trips/{trip}/days/1/items/{it['id']}",
-            {"title": "宽窄巷子", "startTime": "10:00", "endTime": "12:00", "cost": 80})
+            {"title": "宽窄巷子", "startTime": "10:00", "durationMin": 120, "cost": 80})
 edited = None
 if s == 200:
     edited = next((i for i in d["days"][0]["items"] if i["id"] == it["id"]), None)

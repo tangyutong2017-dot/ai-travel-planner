@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { getTripDetail } from "../../api/trips";
 import { Divider, WBtn, WImgBox } from "../../components/ui/Primitives";
 import type { DayPlan, Itinerary } from "../../types/itinerary";
+import { STOP_TYPE_LABELS, endTimeOf, formatDuration } from "../../types/itinerary";
+import { LOCAL_TRANSPORT_LABELS } from "../../types/trip";
 
 type OutputPageId = "cover" | number;
 
@@ -57,6 +59,17 @@ function PrintPage({
   );
 }
 
+/** 成人/儿童/婴幼儿分别展示——原先只输出总数，2 大 1 小会写成「成人 3 人」。 */
+function travelerLabel(t: Itinerary["travelers"]) {
+  return [
+    t.adults ? `成人 ${t.adults} 人` : "",
+    t.children ? `儿童 ${t.children} 人` : "",
+    t.infants ? `婴幼儿 ${t.infants} 人` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 function CoverPage({ itinerary, totalPages }: { itinerary: Itinerary; totalPages: number }) {
   return (
     <PrintPage itinerary={itinerary} pageNum={1} total={totalPages}>
@@ -64,7 +77,7 @@ function CoverPage({ itinerary, totalPages }: { itinerary: Itinerary; totalPages
         <WImgBox className="w-full h-40 mb-6 rounded-lg" label={`封面 · ${itinerary.destination}`} />
         <h1 className="text-3xl font-bold text-slate-950 mb-2 leading-tight">{itinerary.title}</h1>
         <p className="text-sm font-mono text-slate-500 mb-5">
-          {itinerary.dateRange} · 成人 {itinerary.travelers} 人
+          {itinerary.dateRange} · {travelerLabel(itinerary.travelers)}
         </p>
         <div className="flex justify-center gap-3 mb-8">
           {itinerary.interests.map((tag) => (
@@ -82,7 +95,7 @@ function CoverPage({ itinerary, totalPages }: { itinerary: Itinerary; totalPages
         {[
           ["目的地", itinerary.destination],
           ["出行天数", `${itinerary.days.length} 天`],
-          ["旅行人数", `${itinerary.travelers} 人`],
+          ["旅行人数", travelerLabel(itinerary.travelers)],
         ].map(([key, value]) => (
           <div key={key} className="border border-slate-200 rounded-lg p-4 text-center">
             <p className="text-[10px] font-mono text-slate-400 mb-1 uppercase tracking-widest">{key}</p>
@@ -142,29 +155,35 @@ function DayOutputPage({
                 {index < day.items.length - 1 && <div className="w-px flex-1 bg-sky-100 mt-1" />}
               </div>
               <div className="flex-1 pb-2">
-                {item.transitFromPrev && (
-                  <p className="text-[10px] font-mono text-slate-400 mb-1 -mt-0.5">↳ {item.transitFromPrev}</p>
+                {item.transitMinutes != null && (
+                  <p className="text-[10px] font-mono text-slate-400 mb-1 -mt-0.5">
+                    ↳ {item.transitMode ? LOCAL_TRANSPORT_LABELS[item.transitMode] : "移动"} {item.transitMinutes} 分钟
+                  </p>
                 )}
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="text-sm font-semibold text-slate-900">{item.title}</p>
+                    {/* 地址：带着这份 PDF 出门时最需要的信息，此前只在工作区显示 */}
+                    {item.address && <p className="text-[10px] font-mono text-slate-400 mt-0.5">{item.address}</p>}
                     <div className="flex items-center gap-3 mt-0.5 text-[11px] font-mono text-slate-500">
                       <span>
-                        {item.startTime}-{item.endTime}
+                        {item.startTime}-{endTimeOf(item.startTime, item.durationMin)}
                       </span>
-                      <span>· 约 {item.durationLabel}</span>
+                      <span>· 约 {formatDuration(item.durationMin)}</span>
                       <span>· {item.cost === 0 ? "免费" : `¥ ${item.cost}`}</span>
                     </div>
                   </div>
                   <span className="text-[10px] font-mono border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-sky-700 shrink-0 rounded-full">
-                    {item.type}
+                    {STOP_TYPE_LABELS[item.stopType]}
                   </span>
                 </div>
               </div>
             </div>
           ))}
           <div className="flex items-center gap-2 mt-1 ml-8">
-            <span className="text-[10px] font-mono text-slate-400">↩ 返回酒店</span>
+            <span className="text-[10px] font-mono text-slate-400">
+              {day.stay ? `↩ 返回住宿 · ${day.stay.area}` : "↩ 当晚无住宿安排"}
+            </span>
           </div>
         </div>
 
@@ -174,9 +193,8 @@ function DayOutputPage({
             <WImgBox className="w-full h-32 rounded-md" label="地图占位" />
             <div className="mt-1.5 space-y-0.5">
               {[
-                ["总距离", `${day.route.distanceKm} km`],
-                ["步行", `${day.route.walkKm} km`],
-                ["公共交通", `${day.route.transitKm} km`],
+                ["通勤合计", `${day.items.reduce((n, i) => n + (i.transitMinutes ?? 0), 0)} 分钟`],
+                ["停留合计", formatDuration(day.items.reduce((n, i) => n + i.durationMin, 0))],
               ].map(([key, value]) => (
                 <div key={key} className="flex justify-between text-[10px] font-mono text-slate-500">
                   <span>{key}</span>
@@ -268,7 +286,8 @@ export function PageOutput({ tripId, onBack }: { tripId: string; onBack: () => v
     );
   }
 
-  const totalPages = itinerary.days.length + 2;
+  // 封面 1 页 + 每天 1 页（预算总表整页已移除）
+  const totalPages = itinerary.days.length + 1;
   const activeIndex = pages.findIndex((page) => page.id === activePage);
   const canGoPrev = activeIndex > 0;
   const canGoNext = activeIndex >= 0 && activeIndex < pages.length - 1;
