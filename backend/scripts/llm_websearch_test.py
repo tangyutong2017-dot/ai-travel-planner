@@ -32,10 +32,23 @@ SYSTEM = """你是旅行行程规划师。
 是否需预约、门票与老人儿童优惠、日出日落时间、季节性景观时段。
 请把相关问题合并成一次调用，不要逐条搜。
 
-规划要求：
-- 地点必须真实存在、能在地图上搜到，使用官方全称
+【最重要的格式要求】每条行程要分开写两个字段：
+
+  name  —— 纯地点名，必须能在地图 App 里原样搜到。
+           只写地名本身，不要加括号、不要加说明、不要写"午餐""入住"这类动作。
+           没有对应地点的条目（航班、接驳、自由活动）留空字符串。
+  label —— 给用户看的展示文案，可以自由发挥。
+
+  正确：  name="崇圣寺三塔文化旅游区"   label="崇圣寺三塔（园内电瓶车代步）"
+          name="喜洲古镇"              label="喜洲午餐 · 破酥粑粑"
+          name=""                     label="北京 → 大理 直飞航班"
+  错误：  name="午餐（免辣）"           ← 不是地名
+          name="大理古城酒店（入住）"     ← 混入了动作与括号
+          name="大理古城漫游（人民路）"   ← 混入了说明
+
+其余要求：
 - 同一天的地点应集中在同一片区，不要跨区往返
-- 首日与末日必须包含城际交通（航班/接送机）
+- 首日与末日必须包含城际交通
 - 不要输出具体时刻，也不要估算通勤时间——这两项由系统用地图 API 计算"""
 
 BRIEF = """为一家三口规划云南大理 3 日行程（2026-09-01 至 09-03）。
@@ -44,7 +57,8 @@ BRIEF = """为一家三口规划云南大理 3 日行程（2026-09-01 至 09-03�
 
 最终只输出 JSON：
 {"title":"...","days":[{"day":1,"theme":"...","stops":[
- {"name":"...","type":"sight|food|activity|hotel|flight|transfer",
+ {"name":"纯地点名或空字符串","label":"展示文案",
+  "type":"sight|food|activity|hotel|flight|transfer",
   "duration_min":120,"reason":"...","note":"预约/电瓶车/优惠等实用提示"}]}]}"""
 
 
@@ -132,10 +146,13 @@ def main():
     plan = json.loads(content[start : end + 1])
     print(f"\n标题：{plan.get('title')}")
 
-    resolved, missing = {}, []
+    resolved, missing, blank = {}, [], 0
     for day in plan["days"]:
         for stop in day["stops"]:
-            name = stop["name"]
+            name = (stop.get("name") or "").strip()
+            if not name:
+                blank += 1
+                continue
             if name in resolved or name in missing:
                 continue
             try:
@@ -145,13 +162,13 @@ def main():
             (resolved.setdefault(name, poi) if poi else missing.append(name))
 
     total = len(resolved) + len(missing)
-    print(f"\n—— 存在性：{len(resolved)}/{total}")
+    print(f"\n—— 存在性：{len(resolved)}/{total}（另有 {blank} 条无对应地点，属正常）")
     for name in missing:
         print(f"   ✗ {name}")
 
     print("\n—— 地理合理性")
     for day in plan["days"]:
-        pts = [resolved[s["name"]] for s in day["stops"] if s["name"] in resolved]
+        pts = [resolved[s["name"]] for s in day["stops"] if (s.get("name") or "") in resolved]
         if len(pts) < 2:
             continue
         coords = [{"lat": p.lat, "lng": p.lng} for p in pts]
@@ -163,7 +180,7 @@ def main():
     for day in plan["days"]:
         for stop in day["stops"]:
             if stop.get("note"):
-                print(f"   {stop['name'][:16]:18} {stop['note'][:44]}")
+                print(f"   {(stop.get('label') or stop.get('name') or '')[:16]:18} {stop['note'][:44]}")
 
     out = "/private/tmp/claude-501/-Users-yutongtang-Desktop-Claude/0a3df5f8-4533-4562-82ea-45b340d448a3/scratchpad/plan_websearch.json"
     with open(out, "w", encoding="utf-8") as f:
