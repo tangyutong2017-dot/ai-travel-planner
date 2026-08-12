@@ -3,7 +3,7 @@ import { getTripDetail } from "../../api/trips";
 import { Divider, WBtn, WImgBox } from "../../components/ui/Primitives";
 import type { DayPlan, Itinerary } from "../../types/itinerary";
 import { STOP_TYPE_LABELS, endTimeOf, formatDuration } from "../../types/itinerary";
-import { LOCAL_TRANSPORT_LABELS } from "../../types/trip";
+import { LOCAL_TRANSPORT_SHORT } from "../../types/trip";
 
 type OutputPageId = "cover" | number;
 
@@ -157,7 +157,7 @@ function DayOutputPage({
               <div className="flex-1 pb-2">
                 {item.transitMinutes != null && (
                   <p className="text-[10px] font-mono text-slate-400 mb-1 -mt-0.5">
-                    ↳ {item.transitMode ? LOCAL_TRANSPORT_LABELS[item.transitMode] : "移动"} {item.transitMinutes} 分钟
+                    ↳ {item.transitMode ? LOCAL_TRANSPORT_SHORT[item.transitMode] : "移动"} {item.transitMinutes} 分钟
                   </p>
                 )}
                 <div className="flex items-start justify-between gap-2">

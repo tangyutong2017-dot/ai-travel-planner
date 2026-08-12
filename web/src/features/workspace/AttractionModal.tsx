@@ -1,4 +1,5 @@
-import { Divider, WAnnotation, WBtn, WImgBox } from "../../components/ui/Primitives";
+import { Divider, WAnnotation, WBtn } from "../../components/ui/Primitives";
+import { StopThumb } from "../../components/ui/StopThumb";
 import type { ItineraryItem } from "../../types/itinerary";
 import { STOP_TYPE_LABELS, endTimeOf, formatDuration } from "../../types/itinerary";
 
@@ -48,7 +49,7 @@ export function ModalAttraction({ item, onClose }: { item: ItineraryItem; onClos
                 alt={`${item.title} 主图`}
               />
             ) : (
-              <WImgBox className="w-52 h-36 shrink-0 rounded-lg" label="景点主图" />
+              <StopThumb stopType={item.stopType} className="w-52 h-36 shrink-0 rounded-lg text-4xl gap-1.5" />
             )}
             <div className="flex-1">
               <div className="flex flex-wrap gap-1.5 mb-3">

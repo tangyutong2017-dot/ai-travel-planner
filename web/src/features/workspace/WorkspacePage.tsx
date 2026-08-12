@@ -11,7 +11,7 @@ import { getJobStatus } from "../../api/jobs";
 import { WAnnotation, WBtn, WImgBox } from "../../components/ui/Primitives";
 import type { Itinerary, ItineraryItem, StopType } from "../../types/itinerary";
 import { STOP_TYPE_LABELS } from "../../types/itinerary";
-import { LOCAL_TRANSPORT_LABELS } from "../../types/trip";
+import { LOCAL_TRANSPORT_SHORT } from "../../types/trip";
 import { AttractionCard } from "./AttractionCard";
 import { RightPanel } from "./RightPanel";
 
@@ -328,7 +328,7 @@ export function PageWorkspace({
                       <div className="w-1.5 h-1.5 rounded bg-sky-500" />
                     </div>
                     <span className="text-[10px] font-mono text-slate-400">
-                      {item.transitMode ? LOCAL_TRANSPORT_LABELS[item.transitMode] : "移动"} {item.transitMinutes} 分钟
+                      {item.transitMode ? LOCAL_TRANSPORT_SHORT[item.transitMode] : "移动"} {item.transitMinutes} 分钟
                     </span>
                   </div>
                 )}

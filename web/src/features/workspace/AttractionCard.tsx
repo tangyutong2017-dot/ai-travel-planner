@@ -1,4 +1,4 @@
-import { WImgBox } from "../../components/ui/Primitives";
+import { StopThumb } from "../../components/ui/StopThumb";
 import type { ItineraryItem } from "../../types/itinerary";
 import { STOP_TYPE_LABELS, endTimeOf, formatDuration } from "../../types/itinerary";
 
@@ -21,7 +21,7 @@ export function AttractionCard({
       {item.imageUrl ? (
         <img className="h-14 w-16 shrink-0 rounded-md object-cover" src={item.imageUrl} alt={`${item.title} 景点图`} />
       ) : (
-        <WImgBox className="w-16 h-14 shrink-0" label="景点图" />
+        <StopThumb stopType={item.stopType} className="w-16 h-14 shrink-0 text-xl" />
       )}
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">

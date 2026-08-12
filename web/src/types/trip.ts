@@ -83,6 +83,14 @@ export const LOCAL_TRANSPORT_LABELS: Record<LocalTransport, string> = {
   driving: "驾车（自驾·打车·包车）",
 };
 
+/** 时间轴展示用的短标签。表单里的 LOCAL_TRANSPORT_LABELS 要说清选项含义，
+ *  展示时「驾车（自驾·打车·包车） 20 分钟」过于啰嗦。 */
+export const LOCAL_TRANSPORT_SHORT: Record<LocalTransport, string> = {
+  walking: "步行",
+  transit: "公交",
+  driving: "驾车",
+};
+
 export const TRAVEL_PARTY_LABELS: Record<TravelParty, string> = {
   solo: "单人",
   couple: "情侣 / 夫妻",
