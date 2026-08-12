@@ -1,6 +1,7 @@
 """行程详情的读写：取详情、POI 补全、单项编辑与删除、整体保存。"""
 
 from copy import deepcopy
+from math import cos, radians, sqrt
 
 import httpx
 from sqlalchemy.orm import Session
@@ -44,7 +45,29 @@ def get_itinerary(db: Session, trip_id: str) -> Itinerary | None:
     return itinerary_from_record(record)
 
 
+# 只有真实地点才值得拿去高德搜索。航班、转移这类条目没有对应 POI，
+# 用「机场专车 → 大理古城」去搜只会匹配到无关结果。
+POI_SEARCHABLE_TYPES = {"sight", "food", "activity", "hotel"}
+
+# 条目已有坐标时，用它校验高德匹配。超过这个距离视为匹配错误而非补全。
+MAX_MATCH_DISTANCE_KM = 3.0
+
+
+def rough_distance_km(a: dict, b: dict) -> float:
+    """等距圆柱近似。城市尺度下足够判断「是不是同一个地方」。"""
+    lat_mid = radians((a["lat"] + b["lat"]) / 2)
+    dx = (b["lng"] - a["lng"]) * cos(lat_mid)
+    dy = b["lat"] - a["lat"]
+    return sqrt(dx * dx + dy * dy) * 111.0
+
+
 def fill_missing_poi_data(record: ItineraryRecord) -> bool:
+    """用高德补全缺失的 POI 信息。
+
+    补全，不是覆盖——作者写的标题与坐标一律保留：
+    - 标题携带意图（「大理古城 · 人民路与复兴路」比「大理古城」信息量大）
+    - 已有坐标是判断高德是否匹配错的依据
+    """
     days = deepcopy(record.days_json)
     changed = False
 
@@ -55,11 +78,11 @@ def fill_missing_poi_data(record: ItineraryRecord) -> bool:
         for item in day.get("items", []):
             if not isinstance(item, dict):
                 continue
-            if item.get("location") and item.get("poiId") and item.get("imageUrl"):
+            if item.get("stopType") not in POI_SEARCHABLE_TYPES:
                 continue
-            # 用「围绕「自然风光」生成核心安排」这种标题去搜，会匹配到无关 POI，
-            # 于是界面上出现假评分和假坐标。
             if is_placeholder_item(item):
+                continue
+            if item.get("poiId") and item.get("imageUrl") and item.get("location"):
                 continue
 
             try:
@@ -70,12 +93,25 @@ def fill_missing_poi_data(record: ItineraryRecord) -> bool:
             if not poi:
                 continue
 
-            item["title"] = poi.name
-            item["address"] = poi.address
-            item["location"] = {"lat": poi.lat, "lng": poi.lng}
+            poi_location = {"lat": poi.lat, "lng": poi.lng}
+            existing = item.get("location")
+
+            # 已有坐标时，高德若指向别处，说明匹配到了同名或近名的其他地点。
+            # 此时保留原坐标并标为未核实，而不是把行程挪到几十公里外。
+            if existing and rough_distance_km(existing, poi_location) > MAX_MATCH_DISTANCE_KM:
+                if item.get("verification") != "unverified":
+                    item["verification"] = "unverified"
+                    changed = True
+                continue
+
+            if not item.get("location"):
+                item["location"] = poi_location
+            if not item.get("address"):
+                item["address"] = poi.address
+            if not item.get("imageUrl"):
+                item["imageUrl"] = poi.image_url
             item["poiId"] = poi.id
             item["verification"] = "verified"
-            item["imageUrl"] = item.get("imageUrl") or poi.image_url
             changed = True
 
     if changed:
