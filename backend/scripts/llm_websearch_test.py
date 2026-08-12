@@ -1,0 +1,174 @@
+"""带联网搜索的规划测试。
+
+与 llm_reliability_test.py 对照，两处不同：
+1. 给模型 web_search 工具，让它边推理边查
+2. schema 去掉 start 与 transit_from_prev_min —— 实测这两个字段是耗时大头（98s → 22s），
+   且模型给的通勤时间系统性低估，本就该由地图 API 算
+
+产出后仍用高德核对：地点是否真实存在、同日是否地理集中。
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+import time
+import urllib.request
+from math import cos, radians, sqrt
+
+sys.path.insert(0, "/Users/yutongtang/Desktop/Exercise/travel-planner/backend")
+
+from app.amap import search_poi  # noqa: E402
+from app.llm import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL  # noqa: E402
+from app.websearch import WEB_SEARCH_TOOL, as_tool_result, is_websearch_configured, web_search  # noqa: E402
+
+MODEL = sys.argv[1] if len(sys.argv) > 1 else "deepseek-v4-flash"
+CITY = "大理"
+MAX_ROUNDS = 3
+
+SYSTEM = """你是旅行行程规划师。
+
+可以用 web_search 查地图数据给不了的信息：景区无障碍设施（电瓶车/索道/台阶）、
+是否需预约、门票与老人儿童优惠、日出日落时间、季节性景观时段。
+请把相关问题合并成一次调用，不要逐条搜。
+
+规划要求：
+- 地点必须真实存在、能在地图上搜到，使用官方全称
+- 同一天的地点应集中在同一片区，不要跨区往返
+- 首日与末日必须包含城际交通（航班/接送机）
+- 不要输出具体时刻，也不要估算通勤时间——这两项由系统用地图 API 计算"""
+
+BRIEF = """为一家三口规划云南大理 3 日行程（2026-09-01 至 09-03）。
+成人 2 人、儿童 1 人（8 岁），从北京飞往大理。
+慢节奏、低体力（父母膝盖不好，爬不了长台阶）、不吃辣、想看洱海日落。
+
+最终只输出 JSON：
+{"title":"...","days":[{"day":1,"theme":"...","stops":[
+ {"name":"...","type":"sight|food|activity|hotel|flight|transfer",
+  "duration_min":120,"reason":"...","note":"预约/电瓶车/优惠等实用提示"}]}]}"""
+
+
+def post(body):
+    request = urllib.request.Request(
+        f"{DEEPSEEK_BASE_URL}/chat/completions",
+        method="POST",
+        headers={"Authorization": f"Bearer {DEEPSEEK_API_KEY}", "Content-Type": "application/json"},
+        data=json.dumps(body).encode(),
+    )
+    with urllib.request.urlopen(request, timeout=300) as response:
+        return json.load(response)
+
+
+def km(a, b):
+    lat_mid = radians((a["lat"] + b["lat"]) / 2)
+    return sqrt(((b["lng"] - a["lng"]) * cos(lat_mid)) ** 2 + (b["lat"] - a["lat"]) ** 2) * 111.0
+
+
+def run():
+    messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": BRIEF}]
+    totals = {"prompt": 0, "completion": 0, "reasoning": 0}
+    searched, llm_seconds, search_seconds = [], 0.0, 0.0
+
+    for rnd in range(MAX_ROUNDS + 1):
+        body = {"model": MODEL, "messages": messages, "temperature": 0.4}
+        # 还允许搜索时挂工具；最后一轮强制收敛为 JSON
+        if rnd < MAX_ROUNDS:
+            body["tools"] = [WEB_SEARCH_TOOL]
+        else:
+            body["response_format"] = {"type": "json_object"}
+
+        t0 = time.time()
+        data = post(body)
+        llm_seconds += time.time() - t0
+
+        usage = data.get("usage", {})
+        totals["prompt"] += usage.get("prompt_tokens", 0)
+        totals["completion"] += usage.get("completion_tokens", 0)
+        totals["reasoning"] += (usage.get("completion_tokens_details") or {}).get("reasoning_tokens", 0)
+
+        message = data["choices"][0]["message"]
+        calls = message.get("tool_calls")
+        if not calls:
+            return message.get("content", ""), totals, searched, llm_seconds, search_seconds
+
+        messages.append(message)
+        for call in calls:
+            args = json.loads(call["function"]["arguments"] or "{}")
+            queries = args.get("queries") or []
+            searched.extend(queries)
+            print(f"  第 {rnd + 1} 轮搜索：{queries}")
+
+            t0 = time.time()
+            results = web_search(queries)
+            search_seconds += time.time() - t0
+
+            messages.append({
+                "role": "tool",
+                "tool_call_id": call["id"],
+                "content": as_tool_result(results),
+            })
+
+    return "", totals, searched, llm_seconds, search_seconds
+
+
+def main():
+    if not is_websearch_configured():
+        print("TAVILY_API_KEY 未配置——请先写入 backend/.env")
+        return
+
+    print(f"=== {MODEL} · 带联网搜索 ===")
+    started = time.time()
+    content, totals, searched, llm_seconds, search_seconds = run()
+    wall = time.time() - started
+
+    print(f"\n总耗时 {wall:.1f}s（LLM {llm_seconds:.1f}s + 搜索 {search_seconds:.1f}s）")
+    print(f"搜索 {len(searched)} 条 | 输入 {totals['prompt']} 输出 {totals['completion']}"
+          f"（推理 {totals['reasoning']}）")
+
+    start, end = content.find("{"), content.rfind("}")
+    if start == -1:
+        print("未拿到 JSON")
+        return
+    plan = json.loads(content[start : end + 1])
+    print(f"\n标题：{plan.get('title')}")
+
+    resolved, missing = {}, []
+    for day in plan["days"]:
+        for stop in day["stops"]:
+            name = stop["name"]
+            if name in resolved or name in missing:
+                continue
+            try:
+                poi = search_poi(name, CITY)
+            except Exception:
+                poi = None
+            (resolved.setdefault(name, poi) if poi else missing.append(name))
+
+    total = len(resolved) + len(missing)
+    print(f"\n—— 存在性：{len(resolved)}/{total}")
+    for name in missing:
+        print(f"   ✗ {name}")
+
+    print("\n—— 地理合理性")
+    for day in plan["days"]:
+        pts = [resolved[s["name"]] for s in day["stops"] if s["name"] in resolved]
+        if len(pts) < 2:
+            continue
+        coords = [{"lat": p.lat, "lng": p.lng} for p in pts]
+        spread = max(km(a, b) for i, a in enumerate(coords) for b in coords[i + 1 :])
+        flag = "✗ 过于分散" if spread > 30 else ("△ 偏大" if spread > 15 else "✓")
+        print(f"   第{day['day']}天 {len(day['stops'])}站  最远 {spread:5.1f} km  {flag}")
+
+    print("\n—— 搜索带来的实用提示")
+    for day in plan["days"]:
+        for stop in day["stops"]:
+            if stop.get("note"):
+                print(f"   {stop['name'][:16]:18} {stop['note'][:44]}")
+
+    out = "/private/tmp/claude-501/-Users-yutongtang-Desktop-Claude/0a3df5f8-4533-4562-82ea-45b340d448a3/scratchpad/plan_websearch.json"
+    with open(out, "w", encoding="utf-8") as f:
+        json.dump(plan, f, ensure_ascii=False, indent=2)
+
+
+if __name__ == "__main__":
+    main()
