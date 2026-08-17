@@ -23,8 +23,34 @@ from app.llm import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL  # noqa: E402
 from app.websearch import WEB_SEARCH_TOOL, as_tool_result, is_websearch_configured, web_search  # noqa: E402
 
 MODEL = sys.argv[1] if len(sys.argv) > 1 else "deepseek-v4-flash"
-CITY = "大理"
+SCENARIO = sys.argv[2] if len(sys.argv) > 2 else "dali"
 MAX_ROUNDS = 3
+
+# 多个场景用于压力测试：大理是基准（短程、平原、单城市），
+# 西藏用来检验长行程、高原安全、多城市与超长点间距离。
+SCENARIOS = {
+    "dali": {
+        "city": "大理",
+        "brief": """为一家三口规划云南大理 3 日行程（2026-09-01 至 09-03）。
+成人 2 人、儿童 1 人（8 岁），从北京飞往大理。
+慢节奏、低体力（父母膝盖不好，爬不了长台阶）、不吃辣、想看洱海日落。""",
+        # 同日最远两点的告警阈值（km）。城市短程行程，超过 30km 基本意味着跨片区折返
+        "spread_warn": 15,
+        "spread_bad": 30,
+    },
+    "tibet": {
+        "city": "拉萨",
+        "brief": """为两位朋友规划西藏 5 日行程（2026-09-10 至 09-14）。
+成人 2 人（28 岁、31 岁），从成都飞往拉萨。
+适中节奏、体力中等、首次进藏有高反顾虑、想看纳木错和布达拉宫。""",
+        # 西藏点间距离本就极大——纳木错距拉萨约 250km，当日往返是常规安排，
+        # 用城市尺度的阈值会把合理行程误判为折返
+        "spread_warn": 120,
+        "spread_bad": 300,
+    },
+}
+
+CITY = SCENARIOS[SCENARIO]["city"]
 
 SYSTEM = """你是旅行行程规划师。
 
@@ -51,9 +77,7 @@ SYSTEM = """你是旅行行程规划师。
 - 首日与末日必须包含城际交通
 - 不要输出具体时刻，也不要估算通勤时间——这两项由系统用地图 API 计算"""
 
-BRIEF = """为一家三口规划云南大理 3 日行程（2026-09-01 至 09-03）。
-成人 2 人、儿童 1 人（8 岁），从北京飞往大理。
-慢节奏、低体力（父母膝盖不好，爬不了长台阶）、不吃辣、想看洱海日落。
+BRIEF = SCENARIOS[SCENARIO]["brief"] + """
 
 最终只输出 JSON：
 {"title":"...","days":[{"day":1,"theme":"...","stops":[
@@ -130,7 +154,7 @@ def main():
         print("TAVILY_API_KEY 未配置——请先写入 backend/.env")
         return
 
-    print(f"=== {MODEL} · 带联网搜索 ===")
+    print(f"=== {MODEL} · {SCENARIO}（{CITY}）· 带联网搜索 ===")
     started = time.time()
     content, totals, searched, llm_seconds, search_seconds = run()
     wall = time.time() - started
@@ -173,7 +197,8 @@ def main():
             continue
         coords = [{"lat": p.lat, "lng": p.lng} for p in pts]
         spread = max(km(a, b) for i, a in enumerate(coords) for b in coords[i + 1 :])
-        flag = "✗ 过于分散" if spread > 30 else ("△ 偏大" if spread > 15 else "✓")
+        bad, warn = SCENARIOS[SCENARIO]["spread_bad"], SCENARIOS[SCENARIO]["spread_warn"]
+        flag = "✗ 过于分散" if spread > bad else ("△ 偏大" if spread > warn else "✓")
         print(f"   第{day['day']}天 {len(day['stops'])}站  最远 {spread:5.1f} km  {flag}")
 
     print("\n—— 搜索带来的实用提示")
@@ -182,7 +207,7 @@ def main():
             if stop.get("note"):
                 print(f"   {(stop.get('label') or stop.get('name') or '')[:16]:18} {stop['note'][:44]}")
 
-    out = "/private/tmp/claude-501/-Users-yutongtang-Desktop-Claude/0a3df5f8-4533-4562-82ea-45b340d448a3/scratchpad/plan_websearch.json"
+    out = f"/private/tmp/claude-501/-Users-yutongtang-Desktop-Claude/0a3df5f8-4533-4562-82ea-45b340d448a3/scratchpad/plan_{SCENARIO}.json"
     with open(out, "w", encoding="utf-8") as f:
         json.dump(plan, f, ensure_ascii=False, indent=2)
 
