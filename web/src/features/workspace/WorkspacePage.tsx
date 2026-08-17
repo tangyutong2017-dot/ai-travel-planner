@@ -359,7 +359,7 @@ export function PageWorkspace({
         </div>
       </div>
 
-      <RightPanel tripId={tripId} day={day} onOutput={onOutput} />
+      <RightPanel tripId={tripId} day={day} notes={itinerary.notes} onOutput={onOutput} />
       {editingItem && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/35">
           <div className="w-[520px] rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/20">

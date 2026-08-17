@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { WAnnotation, WBtn } from "../../components/ui/Primitives";
-import type { DayPlan } from "../../types/itinerary";
+import type { DayPlan, PlanNote } from "../../types/itinerary";
 import { formatDuration } from "../../types/itinerary";
 import { DayMap } from "../../components/ui/DayMap";
 
@@ -37,7 +37,19 @@ function CollapsibleSection({
   );
 }
 
-export function RightPanel({ tripId, day, onOutput }: { tripId: string; day: DayPlan; onOutput: () => void }) {
+export function RightPanel({
+  tripId,
+  day,
+  notes,
+  onOutput,
+}: {
+  tripId: string;
+  day: DayPlan;
+  notes: PlanNote[];
+  onOutput: () => void;
+}) {
+  // 此前 .slice(0, 3) 会静默丢弃多余的说明——婺源某天有 5 条，后 2 条永远看不到
+  const dayReasons = day.items.filter((item) => item.reason);
   const totalTransitMinutes = day.items.reduce((sum, item) => sum + (item.transitMinutes ?? 0), 0);
   const totalStayMinutes = day.items.reduce((sum, item) => sum + item.durationMin, 0);
   const dataStats = [
@@ -117,18 +129,48 @@ export function RightPanel({ tripId, day, onOutput }: { tripId: string; day: Day
         <p className="mt-2 text-[10px] text-slate-400">缺失项可通过下方 AI 输入框补充或重新生成。</p>
       </CollapsibleSection>
 
-      <CollapsibleSection title="路线备注" defaultOpen={false}>
-        <div className="space-y-1.5">
-          {day.items
-            .filter((item) => item.reason)
-            .slice(0, 3)
-            .map((item) => (
-              <div key={item.id} className="flex gap-2 text-[10px] font-mono text-slate-600">
-                <span className="text-sky-300 shrink-0">·</span>
-                <span>{item.reason}</span>
-              </div>
-            ))}
-        </div>
+      {/* 「路线备注」与行程级提示合并为一处。
+          按数据来源拆成两个折叠区是实现细节泄漏到界面——用户想的是
+          「这次行程有什么要注意的」，而不是「哪些是条目级、哪些是行程级」。
+          全程提示在每天重复出现是有意的：这类信息的价值就在于随时可查。 */}
+      <CollapsibleSection title="行程说明" badge={`${dayReasons.length + notes.length}`} defaultOpen={false}>
+        {dayReasons.length > 0 && (
+          <div className="mb-3">
+            <p className="mb-1.5 text-[10px] font-mono uppercase tracking-widest text-slate-400">今日安排</p>
+            <div className="space-y-1.5">
+              {dayReasons.map((item) => (
+                <div key={item.id} className="flex gap-2 text-[10px] font-mono leading-relaxed text-slate-600">
+                  <span className="shrink-0 text-sky-300">·</span>
+                  <span>{item.reason}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {notes.length > 0 && (
+          <div>
+            <p className="mb-1.5 text-[10px] font-mono uppercase tracking-widest text-slate-400">全程提示</p>
+            <div className="space-y-1.5">
+              {notes.map((note, index) => (
+                <div
+                  key={`${note.kind}-${index}`}
+                  className="flex gap-2 text-[10px] font-mono leading-relaxed text-slate-600"
+                >
+                  {/* alert 是给用户的提醒，assumption 是系统对数据边界的声明，性质不同 */}
+                  <span className={`shrink-0 ${note.kind === "alert" ? "text-amber-500" : "text-slate-400"}`}>
+                    {note.kind === "alert" ? "⚠" : "ℹ"}
+                  </span>
+                  <span>{note.text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {dayReasons.length === 0 && notes.length === 0 && (
+          <p className="text-[10px] font-mono text-slate-400">暂无说明</p>
+        )}
       </CollapsibleSection>
 
       <div className="mt-auto border-t border-slate-100 p-3">
