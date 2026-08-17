@@ -16,11 +16,12 @@ import logging
 import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
+from datetime import date, timedelta
 from difflib import SequenceMatcher
 from typing import Any, Callable
 from uuid import uuid4
 
-from .amap import AmapPoi, driving_route, search_poi, search_pois, weather_for_city
+from .amap import AmapPoi, driving_route, search_poi, search_pois, weather_forecast_for_city
 from .llm import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
 from .models import CreateTripPayload, Itinerary, LocalTransport, StopType
 from .prompts import SYSTEM_PROMPT, build_user_prompt
@@ -63,6 +64,14 @@ def _post(body: dict[str, Any], timeout: float) -> dict[str, Any]:
 
 def draft_plan(payload: CreateTripPayload, on_progress: ProgressFn) -> dict[str, Any]:
     """让模型产出行程骨架，过程中可调用 web_search。"""
+    highest = 0
+
+    def report(progress: int, message: str) -> None:
+        # 进度只增不减。搜索报 30、下一轮起始报 27 会让进度条回退，看着像出错了
+        nonlocal highest
+        highest = max(highest, progress)
+        on_progress(highest, message)
+
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": build_user_prompt(payload)},
@@ -70,6 +79,12 @@ def draft_plan(payload: CreateTripPayload, on_progress: ProgressFn) -> dict[str,
     tools = [WEB_SEARCH_TOOL] if is_websearch_configured() else None
 
     for round_index in range(MAX_SEARCH_ROUNDS + 1):
+        # 单次调用要一分钟上下，进度条会长时间不动。把预期说出来，
+        # 用户知道「还要一会儿」比看着 15% 卡住不动要好
+        report(
+            min(15 + round_index * 12, 50),
+            "正在规划行程结构，大约需要 1 分钟" if round_index == 0 else "正在结合查到的信息调整安排",
+        )
         body: dict[str, Any] = {"model": DEEPSEEK_MODEL, "messages": messages, "temperature": 0.4}
         if tools and round_index < MAX_SEARCH_ROUNDS:
             body["tools"] = tools
@@ -91,7 +106,7 @@ def draft_plan(payload: CreateTripPayload, on_progress: ProgressFn) -> dict[str,
             except json.JSONDecodeError:
                 args = {}
             queries = args.get("queries") or []
-            on_progress(30, f"正在查证：{'、'.join(q[:14] for q in queries[:2])}")
+            report(28 + round_index * 12, f"正在查证：{'、'.join(q[:14] for q in queries[:2])}")
             messages.append({
                 "role": "tool",
                 "tool_call_id": call["id"],
@@ -227,34 +242,58 @@ def transit_minutes_between(a: AmapPoi, b: AmapPoi) -> int | None:
 # —— 时间轴 ——
 
 
+# 本身即「移动」的条目：它们的时长就是通勤时间，不该再叠加一次段间通勤
+MOVEMENT_TYPES = {"flight", "train", "transfer"}
+
+
 def build_time_axis(
     stops: list[dict[str, Any]], resolved: dict[str, AmapPoi], pace: str
 ) -> list[dict[str, Any]]:
     """按停留时长与真实通勤推算每条的起始时刻。
 
-    LLM 不给时刻，这里算。相邻两个有坐标的地点之间查一次真实驾车耗时；
-    查不到就留空，宁可不显示也不编造。
+    两条规则：
+    1. transfer 夹在两个已核实地点之间时，用真实驾车时长替换模型估的时长——
+       模型估的通勤系统性偏低，而这里恰好能拿到真值。
+    2. 紧跟移动条目的下一条不再单独计通勤，否则同一段路会被算两次
+       （实测：三河古镇返程既算了 transfer 的 90 分钟，又加了 47 分钟真实通勤）。
     """
+    pois = [resolved.get((stop.get("name") or "").strip()) for stop in stops]
+    durations = [max(int(stop.get("duration_min") or 60), 10) for stop in stops]
+
+    # 规则 1：市内转移用真实驾车时长校正。跨城的 flight/train 无法用驾车路线衡量，保持原值
+    for index, stop in enumerate(stops):
+        if stop.get("type") != "transfer":
+            continue
+        before = next((pois[j] for j in range(index - 1, -1, -1) if pois[j]), None)
+        after = next((pois[j] for j in range(index + 1, len(pois)) if pois[j]), None)
+        if before and after:
+            real = transit_minutes_between(before, after)
+            if real:
+                durations[index] = real
+
     hour, minute = DAY_START_BY_PACE.get(pace, (8, 30))
     cursor = hour * 60 + minute
     previous: AmapPoi | None = None
+    previous_was_movement = False
     out: list[dict[str, Any]] = []
 
-    for stop in stops:
-        name = (stop.get("name") or "").strip()
-        poi = resolved.get(name)
+    for index, stop in enumerate(stops):
+        poi = pois[index]
+        is_movement = stop.get("type") in MOVEMENT_TYPES
 
         transit: int | None = None
-        if previous is not None and poi is not None:
+        # 规则 2：上一条是移动条目的话，那段路已经计过时了
+        if previous is not None and poi is not None and not previous_was_movement and not is_movement:
             transit = transit_minutes_between(previous, poi)
             if transit:
                 cursor += transit
 
-        duration = max(int(stop.get("duration_min") or 60), 10)
-        out.append({**stop, "_startMinutes": cursor, "_transitMinutes": transit})
-        cursor += duration
+        out.append({**stop, "_startMinutes": cursor, "_transitMinutes": transit,
+                    "_durationMin": durations[index]})
+        cursor += durations[index]
         if poi is not None:
             previous = poi
+        previous_was_movement = is_movement
 
     return out
 
@@ -287,6 +326,8 @@ def to_itinerary(
     days_out = []
     route: list[str] = []
 
+    dates = day_dates(payload.startDate, len(plan.get("days") or []))
+
     for index, day in enumerate(plan.get("days") or [], start=1):
         stops = build_time_axis(
             day.get("stops") or [], resolved, payload.preferences.pace
@@ -305,7 +346,7 @@ def to_itinerary(
                 "title": label,
                 "stopType": _stop_type(stop.get("type")),
                 "startTime": _hhmm(stop["_startMinutes"]),
-                "durationMin": max(int(stop.get("duration_min") or 60), 10),
+                "durationMin": stop["_durationMin"],
                 "cost": _ticket_cost(poi),
                 "optional": bool(stop.get("optional")),
                 "bookRequired": "预约" in str(stop.get("note") or ""),
@@ -321,18 +362,14 @@ def to_itinerary(
                 "mealType": None,
             })
 
-        weather = weather_by_city.get(city)
+        iso_date = dates[index - 1] if index - 1 < len(dates) else ""
+        weather = (weather_by_city.get(city) or {}).get(iso_date)
         days_out.append({
             "day": index,
-            "date": str(day.get("date") or f"第 {index} 天"),
+            "date": iso_date or str(day.get("date") or f"第 {index} 天"),
             "city": city,
             "title": str(day.get("theme") or f"{city} Day {index}"),
-            "weather": weather or {
-                "icon": "☀️",
-                "desc": "待查询",
-                "range": "--",
-                "tip": None,
-            },
+            "weather": weather or NO_FORECAST,
             "stay": None,
             "items": items,
         })
@@ -368,18 +405,56 @@ def _ticket_cost(poi: AmapPoi | None) -> int:
     return int(digits) if digits and len(digits) <= 4 else 0
 
 
-def fetch_weather(cities: list[str]) -> dict[str, Any]:
+def fetch_weather(cities: list[str]) -> dict[str, dict[str, Any]]:
+    """按城市取预报，返回 {城市: {日期: 天气}}。"""
+
     def one(city: str):
         try:
-            report = weather_for_city(city)
+            return city, weather_forecast_for_city(city)
         except Exception:
-            report = None
-        if not report:
-            return city, None
-        return city, {"icon": "☀️", "desc": report.desc, "range": report.range, "tip": report.tip}
+            return city, {}
 
     with ThreadPoolExecutor(max_workers=4) as pool:
-        return {city: data for city, data in pool.map(one, cities) if data}
+        return {
+            city: {
+                day: {"icon": WEATHER_ICONS.get(_icon_key(w.desc), "☀️"), "desc": w.desc,
+                      "range": w.range, "tip": w.tip}
+                for day, w in forecast.items()
+            }
+            for city, forecast in pool.map(one, cities)
+        }
+
+
+# 高德只预报未来 3~4 天。出行日期更远时如实说明，不拿今天的天气冒充——
+# 一份 9 月 1 日出发的行程显示 8 月 17 日的天气，比不显示更糟。
+NO_FORECAST = {
+    "icon": "📅",
+    "desc": "暂无预报",
+    "range": "--",
+    "tip": "出行日期超出天气预报范围（约 3 天），临近出发时会自动更新。",
+}
+
+
+def _icon_key(desc: str) -> str:
+    for key in WEATHER_ICONS:
+        if key in desc:
+            return key
+    return ""
+
+
+WEATHER_ICONS = {
+    "雷": "⛈️", "雪": "❄️", "雨": "🌧️", "阴": "☁️", "云": "⛅",
+    "雾": "🌫️", "霾": "🌫️", "风": "💨", "晴": "☀️",
+}
+
+
+def day_dates(start_date: str, days: int) -> list[str]:
+    """从出发日推算每天的真实日期。不依赖模型给的 date 字段。"""
+    try:
+        start = date.fromisoformat(start_date)
+    except ValueError:
+        return [""] * days
+    return [(start + timedelta(days=offset)).isoformat() for offset in range(days)]
 
 
 # —— 入口 ——
@@ -388,7 +463,7 @@ def fetch_weather(cities: list[str]) -> dict[str, Any]:
 def generate_itinerary(trip_id: str, payload: CreateTripPayload, on_progress: ProgressFn) -> Itinerary:
     started = time.perf_counter()
 
-    on_progress(15, "正在理解你的偏好")
+    on_progress(10, "正在理解你的偏好与出行约束")
     plan = draft_plan(payload, on_progress)
 
     all_stops = [stop for day in (plan.get("days") or []) for stop in (day.get("stops") or [])]

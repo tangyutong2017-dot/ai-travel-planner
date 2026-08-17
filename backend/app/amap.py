@@ -317,9 +317,20 @@ def geocode_city(city: str, timeout: float = 12.0) -> str | None:
 
 
 def weather_for_city(city: str, timeout: float = 12.0) -> AmapWeather | None:
+    """当日天气。保留给不关心具体日期的场景。"""
+    forecast = weather_forecast_for_city(city, timeout=timeout)
+    return next(iter(forecast.values()), None) if forecast else None
+
+
+def weather_forecast_for_city(city: str, timeout: float = 12.0) -> dict[str, AmapWeather]:
+    """按日期返回预报，键为 YYYY-MM-DD。
+
+    高德只提供未来 3~4 天。出行日期超出范围时这里不会有对应键——
+    调用方应如实告知「暂无预报」，而不是拿今天的天气顶上去。
+    """
     adcode = geocode_city(city, timeout=timeout)
     if not adcode:
-        return None
+        return {}
 
     time.sleep(AMAP_REQUEST_INTERVAL_SECONDS)
     response = httpx.get(
@@ -335,17 +346,19 @@ def weather_for_city(city: str, timeout: float = 12.0) -> AmapWeather | None:
 
     forecasts = data.get("forecasts") or []
     casts = forecasts[0].get("casts") if forecasts else []
-    if not casts:
-        return None
 
-    today = casts[0]
-    day_weather = str(today.get("dayweather") or "待查询")
-    night_weather = str(today.get("nightweather") or day_weather)
-    day_temp = str(today.get("daytemp") or "--")
-    night_temp = str(today.get("nighttemp") or "--")
-    desc = day_weather if day_weather == night_weather else f"{day_weather}转{night_weather}"
-    return AmapWeather(
-        desc=desc,
-        range=f"{night_temp}-{day_temp}°C",
-        tip="天气来自高德预报，出行前建议再次确认。",
-    )
+    out: dict[str, AmapWeather] = {}
+    for cast in casts or []:
+        date = str(cast.get("date") or "").strip()
+        if not date:
+            continue
+        day_weather = str(cast.get("dayweather") or "待查询")
+        night_weather = str(cast.get("nightweather") or day_weather)
+        day_temp = str(cast.get("daytemp") or "--")
+        night_temp = str(cast.get("nighttemp") or "--")
+        out[date] = AmapWeather(
+            desc=day_weather if day_weather == night_weather else f"{day_weather}转{night_weather}",
+            range=f"{night_temp}-{day_temp}°C",
+            tip="天气来自高德预报，出行前建议再次确认。",
+        )
+    return out
