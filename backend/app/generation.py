@@ -18,6 +18,7 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 from difflib import SequenceMatcher
+from math import cos, radians, sqrt
 from typing import Any, Callable
 from uuid import uuid4
 
@@ -157,6 +158,13 @@ def _name_variants(name: str, destination: str) -> list[str]:
 # 低于此值宁可判为未核实——错误的坐标比没有坐标更糟。
 MATCH_THRESHOLD = 0.5
 
+# 命中点与目的地中心的最大容许距离（公里）。
+# 高德检索带 city_limit=false，会跨省返回同名地点——实测「光明港琼甜茶馆」被
+# 子串回退切成「光明港」后匹配到了福州，于是拉萨市内一段通勤算出 3246 分钟（54 小时）。
+# 阈值要同时容纳两类事实：纳木错距拉萨约 250km 是合理的当日往返，而拉萨到福州
+# 是 2900km 的误匹配。400km 卡在中间——省内长途放行，跨省拦截。
+MAX_DISTANCE_FROM_DESTINATION_KM = 400
+
 
 def match_score(query: str, poi: AmapPoi) -> float:
     """查询词与候选 POI 的相似度。
@@ -180,14 +188,31 @@ def match_score(query: str, poi: AmapPoi) -> float:
     return SequenceMatcher(None, q, poi.name.replace(" ", "")).ratio()
 
 
-def resolve_place(name: str, city: str, destination: str) -> AmapPoi | None:
-    """核实一个地名。先精确查，失败再从候选里挑相似度最高的。"""
+def km_between(a: AmapPoi, b: AmapPoi) -> float:
+    lat_mid = radians((a.lat + b.lat) / 2)
+    return sqrt(((b.lng - a.lng) * cos(lat_mid)) ** 2 + (b.lat - a.lat) ** 2) * 111.0
+
+
+def is_near_destination(poi: AmapPoi, center: AmapPoi | None) -> bool:
+    """挡住跨省误匹配。没有中心点可比时放行——宁可漏检也不误杀。"""
+    if center is None:
+        return True
+    return km_between(poi, center) <= MAX_DISTANCE_FROM_DESTINATION_KM
+
+
+def resolve_place(
+    name: str, city: str, destination: str, center: AmapPoi | None = None
+) -> AmapPoi | None:
+    """核实一个地名。先精确查，失败再从候选里挑相似度最高的。
+
+    命中后还要过一道地理检查：高德带 city_limit=false，会跨省返回同名地点。
+    """
     for variant in _name_variants(name, destination):
         try:
             poi = search_poi(variant, city)
         except Exception:  # 网络异常不该中断整次生成
             poi = None
-        if poi:
+        if poi and is_near_destination(poi, center):
             return poi
 
     # 精确查询全部落空——取未过滤的候选做模糊比对
@@ -198,7 +223,10 @@ def resolve_place(name: str, city: str, destination: str) -> AmapPoi | None:
             continue
         if not candidates:
             continue
-        best = max(candidates, key=lambda c: match_score(variant, c))
+        nearby = [c for c in candidates if is_near_destination(c, center)]
+        if not nearby:
+            continue
+        best = max(nearby, key=lambda c: match_score(variant, c))
         score = match_score(variant, best)
         if score >= MATCH_THRESHOLD:
             logger.info("模糊命中 %s → %s（相似度 %.2f）", name, best.name, score)
@@ -207,7 +235,17 @@ def resolve_place(name: str, city: str, destination: str) -> AmapPoi | None:
     return None
 
 
-def resolve_all(stops: list[dict[str, Any]], city: str, destination: str) -> dict[str, AmapPoi]:
+def destination_center(destination: str) -> AmapPoi | None:
+    """目的地的中心点，用作跨省误匹配的判据。查不到就退回不设限。"""
+    try:
+        return search_poi(destination, destination)
+    except Exception:
+        return None
+
+
+def resolve_all(
+    stops: list[dict[str, Any]], city: str, destination: str, center: AmapPoi | None = None
+) -> dict[str, AmapPoi]:
     """批量核实地名。并发——串行时几十个地点会明显拖慢。"""
     names = {
         (stop.get("name") or "").strip()
@@ -218,7 +256,7 @@ def resolve_all(stops: list[dict[str, Any]], city: str, destination: str) -> dic
         return {}
 
     with ThreadPoolExecutor(max_workers=8) as pool:
-        pairs = list(pool.map(lambda n: (n, resolve_place(n, city, destination)), sorted(names)))
+        pairs = list(pool.map(lambda n: (n, resolve_place(n, city, destination, center)), sorted(names)))
 
     # 记下查不到的原始地名。没有这行，核实失败时无从知道模型当时拿什么去搜的
     failed = [name for name, poi in pairs if not poi]
@@ -313,7 +351,7 @@ def enrich_stops(
 
 
 def resolve_stays(
-    plan: dict[str, Any], city: str, destination: str
+    plan: dict[str, Any], city: str, destination: str, center: AmapPoi | None = None
 ) -> dict[int, tuple[dict[str, Any], AmapPoi | None]]:
     """核实每天的住宿片区。只认片区不认具体酒店——无法核实空房与价格。
 
@@ -332,7 +370,7 @@ def resolve_stays(
 
     unique = sorted(set(wanted.values()))
     with ThreadPoolExecutor(max_workers=4) as pool:
-        located = dict(pool.map(lambda a: (a, resolve_place(a, city, destination)), unique))
+        located = dict(pool.map(lambda a: (a, resolve_place(a, city, destination, center)), unique))
 
     out: dict[int, tuple[dict[str, Any], AmapPoi | None]] = {}
     for index, area in wanted.items():
@@ -518,12 +556,13 @@ def generate_itinerary(trip_id: str, payload: CreateTripPayload, on_progress: Pr
     plan = draft_plan(payload, on_progress)
 
     all_stops = [stop for day in (plan.get("days") or []) for stop in (day.get("stops") or [])]
-    on_progress(60, "正在核实地点信息")
-    resolved = resolve_all(all_stops, payload.destination, payload.destination)
+    on_progress(58, "正在核实地点信息")
+    center = destination_center(payload.destination)
+    resolved = resolve_all(all_stops, payload.destination, payload.destination, center)
 
     cities = {str(day.get("city") or payload.destination) for day in (plan.get("days") or [])}
     on_progress(72, "正在确认住宿片区")
-    stays = resolve_stays(plan, payload.destination, payload.destination)
+    stays = resolve_stays(plan, payload.destination, payload.destination, center)
 
     on_progress(80, "正在查询路线与天气")
     weather = fetch_weather(sorted(cities))

@@ -1,5 +1,6 @@
 import os
 import time
+from threading import Lock
 from dataclasses import dataclass
 
 import httpx
@@ -12,6 +13,21 @@ load_app_env()
 AMAP_API_KEY = os.getenv("AMAP_API_KEY", "")
 AMAP_BASE_URL = "https://restapi.amap.com"
 AMAP_REQUEST_INTERVAL_SECONDS = 0.25
+
+# 全局节流。原先每处调用各自 time.sleep，但并发时每个线程只是各睡各的，
+# 完全挡不住 QPS 限制——8 线程 × 每个地名 5~10 次检索，超限的请求被异常吞掉，
+# 表现为地点「时好时坏地核实不到」。这里用锁把请求间隔真正串起来。
+_throttle_lock = Lock()
+_last_request_at = 0.0
+
+
+def _throttle() -> None:
+    global _last_request_at
+    with _throttle_lock:
+        wait = AMAP_REQUEST_INTERVAL_SECONDS - (time.monotonic() - _last_request_at)
+        if wait > 0:
+            time.sleep(wait)
+        _last_request_at = time.monotonic()
 
 
 class AmapUnavailableError(RuntimeError):
@@ -161,7 +177,7 @@ def search_poi_once(keyword: str, city: str, timeout: float = 12.0) -> AmapPoi |
 
 
 def search_pois_once(keyword: str, city: str, limit: int = 5, timeout: float = 12.0) -> list[AmapPoi]:
-    time.sleep(AMAP_REQUEST_INTERVAL_SECONDS)
+    _throttle()
     response = httpx.get(
         f"{AMAP_BASE_URL}/v5/place/text",
         params={
@@ -237,7 +253,7 @@ def walking_route(origin: dict[str, float], destination: dict[str, float], timeo
     if not AMAP_API_KEY:
         raise AmapUnavailableError("AMAP_API_KEY is not configured")
 
-    time.sleep(AMAP_REQUEST_INTERVAL_SECONDS)
+    _throttle()
     response = httpx.get(
         f"{AMAP_BASE_URL}/v3/direction/walking",
         params={
@@ -267,7 +283,7 @@ def driving_route(origin: dict[str, float], destination: dict[str, float], timeo
     if not AMAP_API_KEY:
         raise AmapUnavailableError("AMAP_API_KEY is not configured")
 
-    time.sleep(AMAP_REQUEST_INTERVAL_SECONDS)
+    _throttle()
     response = httpx.get(
         f"{AMAP_BASE_URL}/v3/direction/driving",
         params={
@@ -297,7 +313,7 @@ def geocode_city(city: str, timeout: float = 12.0) -> str | None:
     if not AMAP_API_KEY:
         raise AmapUnavailableError("AMAP_API_KEY is not configured")
 
-    time.sleep(AMAP_REQUEST_INTERVAL_SECONDS)
+    _throttle()
     response = httpx.get(
         f"{AMAP_BASE_URL}/v3/geocode/geo",
         params={"key": AMAP_API_KEY, "address": city},
@@ -332,7 +348,7 @@ def weather_forecast_for_city(city: str, timeout: float = 12.0) -> dict[str, Ama
     if not adcode:
         return {}
 
-    time.sleep(AMAP_REQUEST_INTERVAL_SECONDS)
+    _throttle()
     response = httpx.get(
         f"{AMAP_BASE_URL}/v3/weather/weatherInfo",
         params={"key": AMAP_API_KEY, "city": adcode, "extensions": "all"},
