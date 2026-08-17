@@ -1,0 +1,51 @@
+name: CI
+
+# 只跑不需要外部服务的检查。行程生成依赖 DeepSeek / 高德 / Tavily 三个 key
+# 与一个 Postgres，放进 CI 会让每次 push 都消耗额度且不稳定——
+# 那部分由 backend/tests/smoke_test.py 与 backend/scripts/ 在本地跑。
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  web:
+    name: 前端（格式 · 类型 · lint）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: Prettier 格式检查
+        run: npm run format:check
+      - name: TypeScript 类型检查与构建
+        run: npm run build
+      - name: oxlint
+        run: npm run lint
+
+  backend:
+    name: 后端（导入 · 语法）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r requirements.txt
+      - name: 编译所有模块
+        run: python -m compileall -q app scripts tests
+      - name: 导入检查
+        # 没有 key 与数据库也应能导入——配置缺失不该在 import 期爆炸
+        run: python -c "import app.main"
