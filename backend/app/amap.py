@@ -378,3 +378,54 @@ def weather_forecast_for_city(city: str, timeout: float = 12.0) -> dict[str, Ama
             tip="天气来自高德预报，出行前建议再次确认。",
         )
     return out
+
+
+# 静态地图用 Web 服务 key，与 POI 检索同一把——不需要另外申请 JS API key。
+# 选静态图而非 JS SDK 的理由：输出页要打印成 PDF，交互式地图打印不出来；
+# 工作区右栏那块本来也只是缩略预览。
+STATIC_MAP_MAX_MARKERS = 10
+_MARKER_LABELS = "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+
+def static_map_png(
+    points: list[tuple[float, float]],
+    width: int = 400,
+    height: int = 300,
+    timeout: float = 12.0,
+) -> bytes | None:
+    """按坐标序列渲染一张带编号标记与连线的地图。
+
+    points 为 (lat, lng) 序列，顺序即行程顺序。无坐标时返回 None，
+    由调用方决定怎么兜底——不画一张空地图冒充。
+    """
+    if not AMAP_API_KEY or not points:
+        return None
+
+    coords = [f"{lng:.6f},{lat:.6f}" for lat, lng in points]
+    params: dict[str, str] = {
+        "key": AMAP_API_KEY,
+        "size": f"{width}*{height}",
+        "scale": "2",  # 高清屏
+    }
+
+    labelled = coords[:STATIC_MAP_MAX_MARKERS]
+    params["markers"] = "|".join(
+        f"mid,0x2563eb,{_MARKER_LABELS[i]}:{c}" for i, c in enumerate(labelled)
+    )
+    if len(coords) > 1:
+        # 连线画出当天动线；权重 4、蓝色、不填充
+        params["paths"] = f"4,0x2563eb,1,,:{';'.join(coords)}"
+    else:
+        # 单点时高德不会自动定位，显式给中心与缩放
+        params["location"] = coords[0]
+        params["zoom"] = "14"
+
+    _throttle()
+    response = httpx.get(f"{AMAP_BASE_URL}/v3/staticmap", params=params, timeout=timeout)
+    response.raise_for_status()
+
+    # 出错时高德返回 JSON 而不是图片
+    if "image" not in response.headers.get("content-type", ""):
+        raise AmapUnavailableError(response.text[:200])
+
+    return response.content

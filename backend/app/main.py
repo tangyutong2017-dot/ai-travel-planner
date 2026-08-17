@@ -1,12 +1,13 @@
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Response
 from fastapi import Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from .agent import get_generation_job, run_generation_job, start_generation_job
+from .amap import static_map_png
 from .db import get_db, init_db, SessionLocal
 from .models import (
     AgentJob,
@@ -144,6 +145,47 @@ def update_trip_item_route(
         raise HTTPException(status_code=404, detail="没有找到这个行程项目")
 
     return updated
+
+
+@app.get("/api/trips/{trip_id}/days/{day_number}/map.png")
+def get_day_map(
+    trip_id: str,
+    day_number: int,
+    width: int = Query(default=480, ge=120, le=1024),
+    height: int = Query(default=320, ge=120, le=1024),
+    db: Session = Depends(get_db),
+) -> Response:
+    """当日动线的静态地图。
+
+    走后端代理而非前端直连，是为了让高德 key 留在服务端。
+    没有任何坐标时返回 404——由前端决定怎么兜底，不画一张空地图冒充。
+    """
+    itinerary = get_itinerary(db, trip_id)
+    if not itinerary:
+        raise HTTPException(status_code=404, detail="行程不存在或还没有生成过内容")
+
+    day = next((d for d in itinerary.days if d.day == day_number), None)
+    if not day:
+        raise HTTPException(status_code=404, detail="没有这一天的行程")
+
+    points = [
+        (item.location["lat"], item.location["lng"])
+        for item in day.items
+        if item.location and "lat" in item.location and "lng" in item.location
+    ]
+    if not points:
+        raise HTTPException(status_code=404, detail="这一天还没有已核实的坐标")
+
+    try:
+        png = static_map_png(points, width=width, height=height)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"地图服务暂时不可用：{exc}") from exc
+
+    if not png:
+        raise HTTPException(status_code=404, detail="这一天还没有已核实的坐标")
+
+    # 坐标不变则图不变，缓存一天，省掉重复的高德调用
+    return Response(content=png, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
 
 
 @app.post("/api/trips/{trip_id}/generate", response_model=GenerateTripResponse)

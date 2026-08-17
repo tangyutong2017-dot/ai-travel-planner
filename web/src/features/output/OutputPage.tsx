@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { getTripDetail } from "../../api/trips";
 import { Divider, WBtn, WImgBox } from "../../components/ui/Primitives";
+import { DayMap } from "../../components/ui/DayMap";
 import type { DayPlan, Itinerary } from "../../types/itinerary";
 import { STOP_TYPE_LABELS, TIME_SLOT_LABELS, formatDuration } from "../../types/itinerary";
 import { LOCAL_TRANSPORT_SHORT } from "../../types/trip";
@@ -188,7 +189,14 @@ function DayOutputPage({
         <div className="w-44 shrink-0 space-y-5">
           <div>
             <p className="text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-2">当日路线</p>
-            <WImgBox className="w-full h-32 rounded-md" label="地图占位" />
+            <DayMap
+              tripId={itinerary.tripId}
+              dayNumber={day.day}
+              hasCoordinates={day.items.some((item) => item.location)}
+              width={360}
+              height={260}
+              className="h-32 w-full"
+            />
             <div className="mt-1.5 space-y-0.5">
               {[
                 ["通勤合计", `${day.items.reduce((n, i) => n + (i.transitMinutes ?? 0), 0)} 分钟`],

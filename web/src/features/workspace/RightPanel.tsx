@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from "react";
 import { WAnnotation, WBtn } from "../../components/ui/Primitives";
-import type { DayPlan, ItineraryItem } from "../../types/itinerary";
+import type { DayPlan } from "../../types/itinerary";
 import { formatDuration } from "../../types/itinerary";
+import { DayMap } from "../../components/ui/DayMap";
 
 function CollapsibleSection({
   title,
@@ -36,70 +37,7 @@ function CollapsibleSection({
   );
 }
 
-function RouteMiniMap({ day }: { day: DayPlan }) {
-  const points = day.items
-    .map((item, index) => (item.location ? { item, index, lat: item.location.lat, lng: item.location.lng } : null))
-    .filter((point): point is { item: ItineraryItem; index: number; lat: number; lng: number } => point !== null);
-
-  if (points.length === 0) {
-    return (
-      <div className="flex h-36 w-full flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50 text-center">
-        <span className="text-[11px] font-medium text-slate-500">暂无坐标</span>
-        <span className="mt-1 text-[10px] font-mono text-slate-400">生成真实 POI 后显示路线</span>
-      </div>
-    );
-  }
-
-  const minLat = Math.min(...points.map((point) => point.lat));
-  const maxLat = Math.max(...points.map((point) => point.lat));
-  const minLng = Math.min(...points.map((point) => point.lng));
-  const maxLng = Math.max(...points.map((point) => point.lng));
-  const latSpan = Math.max(maxLat - minLat, 0.01);
-  const lngSpan = Math.max(maxLng - minLng, 0.01);
-  const toSvgPoint = (point: { lat: number; lng: number }) => ({
-    x: 18 + ((point.lng - minLng) / lngSpan) * 164,
-    y: 122 - ((point.lat - minLat) / latSpan) * 104,
-  });
-  const svgPoints = points.map((point) => ({ ...point, ...toSvgPoint(point) }));
-
-  return (
-    <div className="relative h-36 w-full overflow-hidden rounded-lg border border-sky-100 bg-[linear-gradient(135deg,#f8fafc,#e0f2fe)]">
-      <svg viewBox="0 0 200 140" className="h-full w-full">
-        <defs>
-          <pattern id={`map-grid-${day.day}`} width="20" height="20" patternUnits="userSpaceOnUse">
-            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#cbd5e1" strokeWidth="0.35" opacity="0.8" />
-          </pattern>
-        </defs>
-        <rect width="200" height="140" fill={`url(#map-grid-${day.day})`} />
-        <polyline
-          points={svgPoints.map((point) => `${point.x},${point.y}`).join(" ")}
-          fill="none"
-          stroke="#0284c7"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          opacity="0.85"
-        />
-        {svgPoints.map((point) => (
-          <g key={point.item.id}>
-            <circle cx={point.x} cy={point.y} r="8" fill="white" stroke="#0284c7" strokeWidth="2" />
-            <text x={point.x} y={point.y + 3.5} textAnchor="middle" className="fill-sky-700 text-[9px] font-bold">
-              {point.index + 1}
-            </text>
-          </g>
-        ))}
-      </svg>
-      <div className="absolute left-2 top-2 rounded-full border border-white/80 bg-white/90 px-2 py-0.5 text-[10px] font-mono text-slate-600 shadow-sm">
-        {points.length} 个坐标点
-      </div>
-      <div className="absolute bottom-2 left-2 right-2 truncate rounded-md bg-white/85 px-2 py-1 text-[10px] text-slate-500 shadow-sm">
-        {points.map((point) => point.item.title).join(" → ")}
-      </div>
-    </div>
-  );
-}
-
-export function RightPanel({ day, onOutput }: { day: DayPlan; onOutput: () => void }) {
+export function RightPanel({ tripId, day, onOutput }: { tripId: string; day: DayPlan; onOutput: () => void }) {
   const totalTransitMinutes = day.items.reduce((sum, item) => sum + (item.transitMinutes ?? 0), 0);
   const totalStayMinutes = day.items.reduce((sum, item) => sum + item.durationMin, 0);
   const dataStats = [
@@ -114,7 +52,14 @@ export function RightPanel({ day, onOutput }: { day: DayPlan; onOutput: () => vo
     // 隐藏后「输出行程方案」CTA 由中栏头部的 xl:hidden 按钮接管。
     <div className="hidden xl:flex w-64 border-l border-slate-200 bg-white/90 backdrop-blur flex-col shrink-0 overflow-auto">
       <CollapsibleSection title="地图预览" badge="路线" defaultOpen={true}>
-        <RouteMiniMap day={day} />
+        <DayMap
+          tripId={tripId}
+          dayNumber={day.day}
+          hasCoordinates={day.items.some((item) => item.location)}
+          width={480}
+          height={320}
+          className="h-36 w-full"
+        />
         <div className="mt-2 space-y-0.5">
           {/* DayRoute 汇总字段已删除——由条目上的 transitMinutes 直接求和，避免两份数据不一致 */}
           {[
