@@ -1,3 +1,6 @@
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
+
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
 from fastapi import Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,7 +23,19 @@ from .models import (
 from .repository import create_trip, delete_itinerary_item, delete_trip, get_itinerary, get_trip, list_trips, seed_initial_data, update_itinerary_item, update_trip_name
 
 
-app = FastAPI(title="Travel Planner API", version="0.1.0")
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    """建表与种子数据。取代已废弃的 @app.on_event("startup")。"""
+    init_db()
+    db = SessionLocal()
+    try:
+        seed_initial_data(db)
+    finally:
+        db.close()
+    yield
+
+
+app = FastAPI(title="Travel Planner API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -32,16 +47,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.on_event("startup")
-def startup() -> None:
-    init_db()
-    db = SessionLocal()
-    try:
-        seed_initial_data(db)
-    finally:
-        db.close()
 
 
 @app.get("/")

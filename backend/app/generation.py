@@ -79,8 +79,10 @@ def draft_plan(payload: CreateTripPayload, on_progress: ProgressFn) -> dict[str,
     for round_index in range(MAX_SEARCH_ROUNDS + 1):
         # 单次调用要一分钟上下，进度条会长时间不动。把预期说出来，
         # 用户知道「还要一会儿」比看着 15% 卡住不动要好
+        # 每个阶段占一段互不重叠的区间，否则「发起调用」与「消化搜索结果」
+        # 会算出同一个数——实测进度在 28% 停了三轮，看着像卡死。
         report(
-            min(15 + round_index * 12, 50),
+            min(14 + round_index * 14, 52),
             "正在规划行程结构，大约需要 1 分钟" if round_index == 0 else "正在结合查到的信息调整安排",
         )
         body: dict[str, Any] = {"model": DEEPSEEK_MODEL, "messages": messages, "temperature": 0.4}
@@ -104,7 +106,7 @@ def draft_plan(payload: CreateTripPayload, on_progress: ProgressFn) -> dict[str,
             except json.JSONDecodeError:
                 args = {}
             queries = args.get("queries") or []
-            report(28 + round_index * 12, f"正在查证：{'、'.join(q[:14] for q in queries[:2])}")
+            report(min(20 + round_index * 14, 56), f"正在查证：{'、'.join(q[:14] for q in queries[:2])}")
             messages.append({
                 "role": "tool",
                 "tool_call_id": call["id"],

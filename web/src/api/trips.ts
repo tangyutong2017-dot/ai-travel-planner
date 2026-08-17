@@ -20,6 +20,15 @@ const toDisplayTrip = (trip: ApiTrip): Trip => ({
   status: apiStatusToDisplay[trip.status],
 });
 
+/** 在途请求去重。
+ *
+ * 侧边栏「最近行程」与列表页各自加载一次，默认筛选下参数完全一致——
+ * 打开首页会对同一个 URL 发两次请求（开发模式下 StrictMode 双渲染再翻倍成四次）。
+ * 同一 URL 的请求尚未返回时复用同一个 Promise，返回后即清除，不做缓存——
+ * 后续的重新加载仍应拿到最新数据。
+ */
+const inFlightTripRequests = new Map<string, Promise<TripListResponse>>();
+
 export async function getTrips(params: GetTripsParams = {}): Promise<TripListResponse> {
   const query = new URLSearchParams();
 
@@ -27,11 +36,16 @@ export async function getTrips(params: GetTripsParams = {}): Promise<TripListRes
   if (params.sort) query.set("sort", params.sort);
   if (params.keyword) query.set("keyword", params.keyword);
 
-  const data = await apiGet<ApiTripListResponse>(`/api/trips${query.size ? `?${query.toString()}` : ""}`);
-  return {
-    ...data,
-    items: data.items.map(toDisplayTrip),
-  };
+  const path = `/api/trips${query.size ? `?${query.toString()}` : ""}`;
+  const pending = inFlightTripRequests.get(path);
+  if (pending) return pending;
+
+  const request = apiGet<ApiTripListResponse>(path)
+    .then((data) => ({ ...data, items: data.items.map(toDisplayTrip) }))
+    .finally(() => inFlightTripRequests.delete(path));
+
+  inFlightTripRequests.set(path, request);
+  return request;
 }
 
 export async function createTrip(payload: CreateTripPayload): Promise<{ tripId: string }> {
