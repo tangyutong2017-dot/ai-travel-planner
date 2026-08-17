@@ -312,6 +312,43 @@ def enrich_stops(
     return out
 
 
+def resolve_stays(
+    plan: dict[str, Any], city: str, destination: str
+) -> dict[int, tuple[dict[str, Any], AmapPoi | None]]:
+    """核实每天的住宿片区。只认片区不认具体酒店——无法核实空房与价格。
+
+    定位到的坐标同时作为该日时间轴的起点锚：让每天第一站也能算出通勤，
+    并让当天首条 transfer 拿到真实时长。
+    """
+    wanted: dict[int, str] = {}
+    for index, day in enumerate(plan.get("days") or [], start=1):
+        stay = day.get("stay")
+        area = str((stay or {}).get("area") or "").strip() if isinstance(stay, dict) else ""
+        if area:
+            wanted[index] = area
+
+    if not wanted:
+        return {}
+
+    unique = sorted(set(wanted.values()))
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        located = dict(pool.map(lambda a: (a, resolve_place(a, city, destination)), unique))
+
+    out: dict[int, tuple[dict[str, Any], AmapPoi | None]] = {}
+    for index, area in wanted.items():
+        poi = located.get(area)
+        stay = (plan["days"][index - 1] or {}).get("stay") or {}
+        out[index] = (
+            {
+                "area": area,
+                "location": {"lat": poi.lat, "lng": poi.lng} if poi else None,
+                "reason": str(stay.get("reason") or "") or None,
+            },
+            poi,
+        )
+    return out
+
+
 # —— 映射 ——
 
 

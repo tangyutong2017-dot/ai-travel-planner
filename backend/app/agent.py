@@ -1,3 +1,5 @@
+import logging
+
 from .db import SessionLocal
 from .generation import generate_itinerary
 from .models import AgentJob
@@ -19,6 +21,9 @@ def start_generation_job(trip_id: str) -> AgentJob:
         return create_agent_job(db, trip_id)
     finally:
         db.close()
+
+
+logger = logging.getLogger(__name__)
 
 
 def run_generation_job(job_id: str) -> None:
@@ -54,6 +59,9 @@ def run_generation_job(job_id: str) -> None:
         try:
             itinerary = generate_itinerary(job.tripId, payload, report)
         except Exception as exc:
+            # 兜底会掩盖真实故障：生成失败时界面看起来只是「质量差」，
+            # 而非「agent 根本没跑」。日志留全栈，job message 只给摘要。
+            logger.exception("行程生成失败，退回占位骨架：%s", exc)
             fallback_reason = str(exc)
             itinerary = create_placeholder_itinerary(job.tripId, payload)
 
