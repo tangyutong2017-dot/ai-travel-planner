@@ -247,7 +247,10 @@ MOVEMENT_TYPES = {"flight", "train", "transfer"}
 
 
 def build_time_axis(
-    stops: list[dict[str, Any]], resolved: dict[str, AmapPoi], pace: str
+    stops: list[dict[str, Any]],
+    resolved: dict[str, AmapPoi],
+    pace: str,
+    anchor: AmapPoi | None = None,
 ) -> list[dict[str, Any]]:
     """按停留时长与真实通勤推算每条的起始时刻。
 
@@ -264,7 +267,9 @@ def build_time_axis(
     for index, stop in enumerate(stops):
         if stop.get("type") != "transfer":
             continue
-        before = next((pois[j] for j in range(index - 1, -1, -1) if pois[j]), None)
+        # 当天第一条就是转移时，前面没有已核实地点——用住宿锚点当起点。
+        # 否则「市区 → 三河古镇」这类首条转移拿不到真实时长，只能采信模型估的 120 分钟。
+        before = next((pois[j] for j in range(index - 1, -1, -1) if pois[j]), None) or anchor
         after = next((pois[j] for j in range(index + 1, len(pois)) if pois[j]), None)
         if before and after:
             real = transit_minutes_between(before, after)
@@ -273,7 +278,10 @@ def build_time_axis(
 
     hour, minute = DAY_START_BY_PACE.get(pace, (8, 30))
     cursor = hour * 60 + minute
-    previous: AmapPoi | None = None
+    # 从住宿片区出发，于是当天第一站也有通勤时间。
+    # 这顺带修掉了「模型漏写长途转移」——三河古镇距市区 40 公里，
+    # 没有锚点时那一天凭空从古镇开始，有锚点则显示为一段真实通勤。
+    previous: AmapPoi | None = anchor
     previous_was_movement = False
     out: list[dict[str, Any]] = []
 
@@ -302,6 +310,39 @@ def _hhmm(total_minutes: int) -> str:
     return f"{(total_minutes // 60) % 24:02d}:{total_minutes % 60:02d}"
 
 
+def resolve_stays(
+    plan: dict[str, Any], city: str, destination: str
+) -> dict[int, tuple[dict[str, Any], AmapPoi | None]]:
+    """核实每天的住宿片区。只认片区不认具体酒店——无法核实空房与价格。"""
+    wanted: dict[int, str] = {}
+    for index, day in enumerate(plan.get("days") or [], start=1):
+        stay = day.get("stay")
+        area = str((stay or {}).get("area") or "").strip() if isinstance(stay, dict) else ""
+        if area:
+            wanted[index] = area
+
+    if not wanted:
+        return {}
+
+    unique = sorted(set(wanted.values()))
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        located = dict(pool.map(lambda a: (a, resolve_place(a, city, destination)), unique))
+
+    out: dict[int, tuple[dict[str, Any], AmapPoi | None]] = {}
+    for index, area in wanted.items():
+        poi = located.get(area)
+        stay = (plan["days"][index - 1] or {}).get("stay") or {}
+        out[index] = (
+            {
+                "area": area,
+                "location": {"lat": poi.lat, "lng": poi.lng} if poi else None,
+                "reason": str(stay.get("reason") or "") or None,
+            },
+            poi,
+        )
+    return out
+
+
 # —— 映射 ——
 
 
@@ -321,6 +362,7 @@ def to_itinerary(
     plan: dict[str, Any],
     resolved: dict[str, AmapPoi],
     weather_by_city: dict[str, Any],
+    stays: dict[int, tuple[dict[str, Any], AmapPoi | None]] | None = None,
 ) -> Itinerary:
     mode = _transit_mode(payload.preferences.localTransport)
     days_out = []
@@ -329,8 +371,11 @@ def to_itinerary(
     dates = day_dates(payload.startDate, len(plan.get("days") or []))
 
     for index, day in enumerate(plan.get("days") or [], start=1):
+        stay_info, stay_poi = (stays or {}).get(index, (None, None))
+        # 前一晚住哪儿，决定这一天从哪里出发
+        anchor_info, anchor_poi = (stays or {}).get(index - 1, (stay_info, stay_poi))
         stops = build_time_axis(
-            day.get("stops") or [], resolved, payload.preferences.pace
+            day.get("stops") or [], resolved, payload.preferences.pace, anchor=anchor_poi
         )
         city = str(day.get("city") or payload.destination)
         if city not in route:
@@ -370,7 +415,7 @@ def to_itinerary(
             "city": city,
             "title": str(day.get("theme") or f"{city} Day {index}"),
             "weather": weather or NO_FORECAST,
-            "stay": None,
+            "stay": stay_info,
             "items": items,
         })
 
@@ -471,11 +516,14 @@ def generate_itinerary(trip_id: str, payload: CreateTripPayload, on_progress: Pr
     resolved = resolve_all(all_stops, payload.destination, payload.destination)
 
     cities = {str(day.get("city") or payload.destination) for day in (plan.get("days") or [])}
-    on_progress(75, "正在查询路线与天气")
+    on_progress(72, "正在确认住宿片区")
+    stays = resolve_stays(plan, payload.destination, payload.destination)
+
+    on_progress(80, "正在查询路线与天气")
     weather = fetch_weather(sorted(cities))
 
     on_progress(90, "正在整理每日行程")
-    itinerary = to_itinerary(trip_id, payload, plan, resolved, weather)
+    itinerary = to_itinerary(trip_id, payload, plan, resolved, weather, stays)
 
     elapsed = round(time.perf_counter() - started, 1)
     # 只统计「本该有 POI」的条目——航班、接驳、休息本就没有对应地点，
