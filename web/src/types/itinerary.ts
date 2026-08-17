@@ -3,9 +3,6 @@ import type { LocalTransport, TravelersPayload } from "./trip";
 /** 条目类型。后四种让城际交通与住宿成为时间轴条目，从而参与时间闭合计算。 */
 export type StopType = "sight" | "food" | "activity" | "rest" | "flight" | "train" | "transfer" | "hotel";
 
-export type Intensity = "low" | "mid" | "high";
-export type BookingUrgency = "high" | "mid" | "low";
-
 /** assumption 允许用户纠正，alert 只读。 */
 export type NoteKind = "assumption" | "alert";
 
@@ -49,7 +46,6 @@ export type ItineraryItem = {
   durationMin: number;
   cost: number;
   optional?: boolean;
-  intensity?: Intensity;
   bookRequired?: boolean;
   verification?: Verification;
   reason?: string;
@@ -59,7 +55,6 @@ export type ItineraryItem = {
   location?: { lat: number; lng: number };
   poiId?: string;
   imageUrl?: string;
-  mealType?: string;
 };
 
 /** 当晚住宿片区。不推荐具体酒店——无法验证空房与价格。city 继承自所属 DayPlan。 */
@@ -80,15 +75,6 @@ export type DayPlan = {
   items: ItineraryItem[];
 };
 
-/** 预订待办。名称从 itemId 指向的条目取，不重复存储。 */
-export type Booking = {
-  itemId: string;
-  channel: string;
-  leadTimeDays?: number;
-  urgency?: BookingUrgency;
-  note?: string;
-};
-
 export type PlanNote = {
   kind: NoteKind;
   text: string;
@@ -105,7 +91,6 @@ export type Itinerary = {
   travelers: TravelersPayload;
   interests: string[];
   notes: PlanNote[];
-  bookings: Booking[];
   days: DayPlan[];
 };
 

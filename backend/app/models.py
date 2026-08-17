@@ -113,11 +113,6 @@ class TripListResponse(BaseModel):
 # 后四种让城际交通与住宿成为时间轴上的条目，从而参与时间闭合计算。
 StopType = Literal["sight", "food", "activity", "rest", "flight", "train", "transfer", "hotel"]
 
-# 体力强度。与输入侧的 activityLevel 配对，低体力用户不应排入 high 项。
-Intensity = Literal["low", "mid", "high"]
-
-BookingUrgency = Literal["high", "mid", "low"]
-
 # AI 说明。assumption 允许用户纠正，alert 只读。
 NoteKind = Literal["assumption", "alert"]
 
@@ -146,7 +141,6 @@ class ItineraryItem(BaseModel):
     durationMin: int = Field(ge=0)
     cost: int = 0
     optional: bool = False
-    intensity: Intensity | None = None
     bookRequired: bool = False
     verification: Verification = "unverified"
     reason: str | None = None
@@ -156,7 +150,6 @@ class ItineraryItem(BaseModel):
     location: dict[str, float] | None = None
     poiId: str | None = None
     imageUrl: str | None = None
-    mealType: str | None = None
 
 
 class UpdateItineraryItemPayload(BaseModel):
@@ -197,16 +190,6 @@ class DayPlan(BaseModel):
     items: list[ItineraryItem]
 
 
-class Booking(BaseModel):
-    """预订待办。名称与所需信息从 itemId 指向的条目取，不重复存储。"""
-
-    itemId: str
-    channel: str
-    leadTimeDays: int | None = Field(default=None, ge=0)
-    urgency: BookingUrgency | None = None
-    note: str | None = None
-
-
 class PlanNote(BaseModel):
     kind: NoteKind
     text: str
@@ -223,7 +206,6 @@ class Itinerary(BaseModel):
     travelers: Travelers
     interests: list[str]
     notes: list[PlanNote] = Field(default_factory=list)
-    bookings: list[Booking] = Field(default_factory=list)
     days: list[DayPlan]
 
 

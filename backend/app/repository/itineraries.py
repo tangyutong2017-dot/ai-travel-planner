@@ -200,7 +200,6 @@ def save_itinerary(db: Session, trip_id: str, itinerary: Itinerary, commit: bool
         "route_json": itinerary.route,
         "interests_json": itinerary.interests,
         "notes_json": [note.model_dump() for note in itinerary.notes],
-        "bookings_json": [booking.model_dump() for booking in itinerary.bookings],
         "days_json": [day.model_dump() for day in itinerary.days],
     }
 

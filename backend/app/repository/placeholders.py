@@ -42,7 +42,6 @@ def create_placeholder_itinerary(trip_id: str, payload: CreateTripPayload) -> It
                 "text": "当前为占位行程，Generation Agent 重写完成后会替换为真实规划。",
             }
         ],
-        bookings=[],
         days=[
             {
                 "day": day,

@@ -445,7 +445,6 @@ def to_itinerary(
                 "location": {"lat": poi.lat, "lng": poi.lng} if poi else None,
                 "poiId": poi.id if poi else None,
                 "imageUrl": poi.image_url if poi else None,
-                "mealType": None,
             })
 
         iso_date = dates[index - 1] if index - 1 < len(dates) else ""
@@ -478,7 +477,6 @@ def to_itinerary(
         "travelers": payload.travelers.model_dump(),
         "interests": payload.preferences.interests,
         "notes": notes,
-        "bookings": [],
         "days": days_out,
     })
 

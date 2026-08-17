@@ -43,7 +43,6 @@ class ItineraryRecord(Base):
     route_json: Mapped[list] = mapped_column(JSONB, default=list)
     interests_json: Mapped[list] = mapped_column(JSONB)
     notes_json: Mapped[list] = mapped_column(JSONB, default=list)
-    bookings_json: Mapped[list] = mapped_column(JSONB, default=list)
     days_json: Mapped[list] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)

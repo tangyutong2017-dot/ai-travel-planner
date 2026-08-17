@@ -87,7 +87,7 @@ if generation_seconds > 20:
 s, detail = call("GET", f"/api/trips/{trip}")
 check("生成后可取详情", s == 200, f"{s} {detail}")
 check("天数与创建请求一致", s == 200 and len(detail.get("days", [])) == 3, str(len(detail.get("days", []))))
-for field in ("originCity", "route", "travelers", "notes", "bookings"):
+for field in ("originCity", "route", "travelers", "notes"):
     check(f"Itinerary 含 {field}", field in detail)
 check("travelers 为结构而非总数", isinstance(detail.get("travelers"), dict), str(detail.get("travelers")))
 d1 = detail["days"][0] if s == 200 and detail.get("days") else {}

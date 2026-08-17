@@ -34,7 +34,6 @@ def itinerary_from_record(record: ItineraryRecord) -> Itinerary:
         travelers=record.travelers_json,
         interests=record.interests_json,
         notes=record.notes_json or [],
-        bookings=record.bookings_json or [],
         days=record.days_json,
     )
 

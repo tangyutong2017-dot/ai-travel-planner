@@ -87,7 +87,9 @@ def run_generation_job(job_id: str) -> None:
             job_id,
             "succeeded",
             100,
-            f"AI 生成未完成（{fallback_reason[:60]}），已给出可编辑的行程骨架"
+            # 给用户的消息不带内部符号名——实测泄露过 "name 'resolve_stays' is not defined"。
+            # 完整堆栈已写进日志，排查看日志即可。
+            "AI 生成未完成，已给出可编辑的行程骨架，你可以手动调整或重新生成"
             if fallback_reason
             else "行程已生成，可进入工作区继续编辑",
         )
