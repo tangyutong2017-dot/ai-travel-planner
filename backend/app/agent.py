@@ -1,4 +1,5 @@
 import logging
+import os
 
 from .db import SessionLocal
 from .generation import generate_itinerary
@@ -26,6 +27,11 @@ def start_generation_job(trip_id: str) -> AgentJob:
 logger = logging.getLogger(__name__)
 
 
+def skip_ai_generation() -> bool:
+    """每次调用时读取，而不是 import 时——便于在同一进程里切换。"""
+    return os.getenv("SKIP_AI_GENERATION", "").lower() in {"1", "true", "yes"}
+
+
 def run_generation_job(job_id: str) -> None:
     """跑一次行程生成。
 
@@ -34,6 +40,10 @@ def run_generation_job(job_id: str) -> None:
 
     生成失败时退回占位行程而不是让任务失败——用户已经等了一分多钟，
     给一份可编辑的骨架比一句报错有用。
+
+    设 ``SKIP_AI_GENERATION=1`` 可跳过 AI 直接产出占位行程。冒烟测试用它——
+    那些断言验的是 API 契约与数据流，AI 质量归 scripts/ 下的专用脚本管。
+    否则单次测试要等一次真实生成（60~135 秒）并消耗 API 额度。
     """
     db = SessionLocal()
     try:
@@ -57,7 +67,11 @@ def run_generation_job(job_id: str) -> None:
 
         fallback_reason = ""
         try:
-            itinerary = generate_itinerary(job.tripId, payload, report)
+            if skip_ai_generation():
+                report(50, "已跳过 AI 生成（SKIP_AI_GENERATION）")
+                itinerary = create_placeholder_itinerary(job.tripId, payload)
+            else:
+                itinerary = generate_itinerary(job.tripId, payload, report)
         except Exception as exc:
             # 兜底会掩盖真实故障：生成失败时界面看起来只是「质量差」，
             # 而非「agent 根本没跑」。日志留全栈，job message 只给摘要。

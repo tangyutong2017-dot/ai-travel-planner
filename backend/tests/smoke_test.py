@@ -1,4 +1,13 @@
-"""后端 API 全量冒烟测试。每条断言对应 PRD 里的一项需求。"""
+"""后端 API 全量冒烟测试。每条断言对应 PRD 里的一项需求。
+
+这些断言验的是 **API 契约与数据流**，不是 AI 质量——后者归 scripts/ 下的
+专用脚本管。因此建议让服务带 SKIP_AI_GENERATION=1 启动：
+
+    SKIP_AI_GENERATION=1 .venv/bin/uvicorn app.main:app --port 8000
+    python3 backend/tests/smoke_test.py
+
+否则每跑一次都要等一次真实生成（60~135 秒）并消耗 API 额度。
+"""
 import json
 import time
 import urllib.parse
@@ -58,6 +67,7 @@ check("触发生成返回 jobId", s == 200 and bool(job), f"{s} {d}")
 
 # 真实 agent 要调 LLM、联网搜索、逐个核实地点，实测 60~135 秒。
 # 此前占位生成是瞬时的，15 秒的轮询上限一直没暴露问题。
+generation_started = time.time()
 final = None
 for _ in range(90):
     s, d = call("GET", f"/api/jobs/{job}")
@@ -67,6 +77,11 @@ for _ in range(90):
     time.sleep(3)
 check("生成任务完成", final is not None and final["status"] == "succeeded", str(final))
 check("任务返回进度与文案", bool(final) and final.get("progress") == 100 and bool(final.get("message")), str(final))
+
+generation_seconds = time.time() - generation_started
+if generation_seconds > 20:
+    print(f"\n  提示：本次生成耗时 {generation_seconds:.0f} 秒，服务似乎在跑真实 AI。")
+    print("       冒烟测试只需验 API 契约，可用 SKIP_AI_GENERATION=1 启动服务以加速。\n")
 
 # --- 行程详情结构 (PRD 9.2 / 9.3) ---
 s, detail = call("GET", f"/api/trips/{trip}")

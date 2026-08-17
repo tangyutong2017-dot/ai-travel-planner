@@ -38,22 +38,41 @@ Available for the agent rewrite, not currently called:
 - `amap.py` — AMap POI search / routing / weather, with fuzzy match filtering
 - `observability.py` — Langfuse span + generation helpers
 
+## 测试
+
+```bash
+# 冒烟测试验的是 API 契约与数据流，不需要真实 AI。
+# 让服务带开关启动，可把单次测试从 2 分钟压到数秒，也不消耗 API 额度。
+SKIP_AI_GENERATION=1 .venv/bin/uvicorn app.main:app --port 8000
+python3 tests/smoke_test.py
+```
+
+AI 生成质量由 `scripts/` 下的专用脚本负责，与冒烟测试分开：
+
+```bash
+python3 scripts/llm_websearch_test.py deepseek-v4-flash dali
+python3 scripts/llm_reliability_test.py deepseek-v4-flash
+```
+
 ## Generation Agent
 
-**The Generation Agent has been removed and is being redesigned from scratch.**
-
-The frontend-facing contract is deliberately kept intact so the wizard and the
-workspace still run end to end:
+已接入，入口在 `app/generation.py`，由 `app/agent.py` 的 `run_generation_job` 调用。
 
 ```txt
 POST /api/trips/{trip_id}/generate   -> { tripId, jobId }
 GET  /api/jobs/{job_id}              -> { status, progress, message }
 ```
 
-`run_generation_job` in `app/agent.py` currently writes a placeholder itinerary.
-That single call is the seam: the new agent plugs in there, and nothing else in
-the API or the frontend needs to change.
+分工（依据见 `docs/Agent立项规划-v0.1.md` 的实测记录）：
 
-The Editing Agent (`POST /api/trips/{trip_id}/edit`) was a no-op stub with no
-frontend caller, so the route was removed entirely. It will come back as part of
-the same redesign.
+| 层 | 负责 |
+|---|---|
+| LLM（deepseek-v4-flash） | 理解偏好、选点取舍、时段判断、写主题与理由 |
+| Tavily 联网搜索 | 预约方式、门票优惠、无障碍设施、日落时间等时效信息 |
+| 高德 | 地点是否存在、坐标、地址、真实通勤、天气 |
+| 代码 | 地名三层匹配、通勤校正、住宿锚定、结构映射 |
+
+生成耗时约 60~135 秒，随天数超线性增长。失败时退回占位骨架而非报错，
+并在日志中记录完整堆栈。
+
+Editing Agent（`POST /api/trips/{trip_id}/edit`）仍未实现。
