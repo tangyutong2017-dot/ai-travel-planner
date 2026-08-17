@@ -194,8 +194,6 @@ class DayPlan(BaseModel):
     generationStatus: DayGenerationStatus = "finalized"
     weather: DayWeather
     stay: Stay | None = None
-    # 当日占用分钟数（Σ停留 + Σ通勤）。不排时刻也要知道这天塞不塞得下
-    plannedMinutes: int = 0
     items: list[ItineraryItem]
 
 

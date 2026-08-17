@@ -280,9 +280,6 @@ def transit_minutes_between(a: AmapPoi, b: AmapPoi) -> int | None:
 # 本身即「移动」的条目：它们的时长就是通勤时间，不该再叠加一次段间通勤
 MOVEMENT_TYPES = {"flight", "train", "transfer"}
 
-# 每日可用时长（分钟），随节奏变化。用于判断这天塞不塞得下，不用于排时刻。
-DAY_CAPACITY_BY_PACE = {"relaxed": 600, "balanced": 720, "packed": 810}
-
 SLOT_ALIASES = {
     "早晨": "dawn", "清晨": "dawn", "早上": "morning", "上午": "morning",
     "中午": "noon", "午间": "noon", "下午": "afternoon",
@@ -450,7 +447,6 @@ def to_itinerary(
             })
 
         iso_date = dates[index - 1] if index - 1 < len(dates) else ""
-        planned = sum((item["durationMin"] + (item["transitMinutes"] or 0)) for item in items)
         weather = (weather_by_city.get(city) or {}).get(iso_date)
         days_out.append({
             "day": index,
@@ -459,7 +455,6 @@ def to_itinerary(
             "title": str(day.get("theme") or f"{city} Day {index}"),
             "weather": weather or NO_FORECAST,
             "stay": stay_info,
-            "plannedMinutes": planned,
             "items": items,
         })
 
@@ -583,8 +578,5 @@ def generate_itinerary(trip_id: str, payload: CreateTripPayload, on_progress: Pr
         if item.poiId or item.verification == "verified" or item.stopType in ("sight", "activity")
     ]
     verified = sum(1 for item in searchable if item.verification == "verified")
-    capacity = DAY_CAPACITY_BY_PACE.get(payload.preferences.pace, 720)
-    overloaded = [day.day for day in itinerary.days if day.plannedMinutes > capacity]
-    suffix = f"；第 {'、'.join(map(str, overloaded))} 天安排偏满" if overloaded else ""
-    on_progress(96, f"生成完成，耗时 {elapsed}s，{verified}/{len(searchable)} 个地点已核实{suffix}")
+    on_progress(96, f"生成完成，耗时 {elapsed}s，{verified}/{len(searchable)} 个地点已核实")
     return itinerary

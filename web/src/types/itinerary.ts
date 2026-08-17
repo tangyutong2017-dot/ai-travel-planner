@@ -77,8 +77,6 @@ export type DayPlan = {
   generationStatus?: "pending" | "generating" | "preview" | "finalized" | "failed";
   weather: { icon: string; desc: string; range: string; tip?: string };
   stay?: Stay | null;
-  /** 当日占用分钟数（Σ停留 + Σ通勤）。不排时刻也要知道这天塞不塞得下 */
-  plannedMinutes?: number;
   items: ItineraryItem[];
 };
 
