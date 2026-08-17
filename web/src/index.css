@@ -46,3 +46,53 @@ textarea:focus-visible {
   outline: 2px solid #38bdf8;
   outline-offset: 2px;
 }
+
+/* ── 输出页打印规则 ──
+   屏幕上输出页是翻页预览（一次只渲染当前页），但 window.print() 会打印
+   整个文档——若不在打印时把全部页显示出来，导出的 PDF 只有当前一页。 */
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  /* 打印时只留纸面，其余一律隐藏 */
+  body * {
+    visibility: hidden;
+  }
+
+  .print-root,
+  .print-root * {
+    visibility: visible;
+  }
+
+  .print-root {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+  }
+
+  /* 屏幕上被翻页隐藏的页，打印时全部显示 */
+  .print-page {
+    display: block !important;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .print-page:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  /* 条目不该被页边切成两半 */
+  .print-avoid-break {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* 浏览器默认不打印背景色与图片，会让版面塌掉 */
+  .print-root * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
