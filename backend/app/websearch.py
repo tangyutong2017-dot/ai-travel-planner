@@ -14,6 +14,7 @@ import os
 import time
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -117,13 +118,17 @@ def web_search(queries: list[str], timeout: float = 20.0) -> dict[str, QueryAnsw
     if not TAVILY_API_KEY:
         raise WebSearchUnavailableError("TAVILY_API_KEY is not configured")
 
-    out: dict[str, QueryAnswer] = {}
-    for query in queries[:MAX_QUERIES_PER_CALL]:
+    picked = queries[:MAX_QUERIES_PER_CALL]
+
+    def one(query: str) -> tuple[str, QueryAnswer]:
         try:
-            out[query] = _search_once(query, timeout)
+            return query, _search_once(query, timeout)
         except (urllib.error.URLError, TimeoutError, ValueError, KeyError):
-            out[query] = QueryAnswer(answer="", results=[])
-    return out
+            return query, QueryAnswer(answer="", results=[])
+
+    # 并发：串行时 8 条查询实测耗时 30.7 秒，而每条本身只要 3~4 秒
+    with ThreadPoolExecutor(max_workers=max(len(picked), 1)) as pool:
+        return dict(pool.map(one, picked))
 
 
 def as_tool_result(results: dict[str, QueryAnswer]) -> str:
