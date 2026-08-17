@@ -30,9 +30,6 @@ from .websearch import WEB_SEARCH_TOOL, as_tool_result, is_websearch_configured,
 # 最多允许模型搜索几轮。实测 2 轮足够，留 3 轮余量防止它卡在搜索循环里。
 MAX_SEARCH_ROUNDS = 3
 
-# 每日起始时刻随节奏变化。若三档都用同样时长，「慢节奏」会算出每个景点待 4 小时。
-DAY_START_BY_PACE = {"relaxed": (9, 30), "balanced": (8, 30), "packed": (8, 0)}
-
 # 模型偶尔给出 schema 之外的类型，兜底到 sight 而不是让整次生成失败。
 VALID_STOP_TYPES: set[str] = {"sight", "food", "activity", "rest", "flight", "train", "transfer", "hotel"}
 
@@ -239,36 +236,54 @@ def transit_minutes_between(a: AmapPoi, b: AmapPoi) -> int | None:
     return route.duration_minutes if route else None
 
 
-# —— 时间轴 ——
+# —— 通勤与时长 ——
 
 
 # 本身即「移动」的条目：它们的时长就是通勤时间，不该再叠加一次段间通勤
 MOVEMENT_TYPES = {"flight", "train", "transfer"}
 
+# 每日可用时长（分钟），随节奏变化。用于判断这天塞不塞得下，不用于排时刻。
+DAY_CAPACITY_BY_PACE = {"relaxed": 600, "balanced": 720, "packed": 810}
 
-def build_time_axis(
+SLOT_ALIASES = {
+    "早晨": "dawn", "清晨": "dawn", "早上": "morning", "上午": "morning",
+    "中午": "noon", "午间": "noon", "下午": "afternoon",
+    "傍晚": "evening", "黄昏": "evening", "晚上": "night", "夜间": "night", "夜晚": "night",
+}
+VALID_SLOTS = {"dawn", "morning", "noon", "afternoon", "evening", "night"}
+
+# 类型兜底：模型没给时段时按条目类型猜一个，总比留空好
+SLOT_BY_TYPE = {"flight": "morning", "train": "morning", "transfer": "morning", "hotel": "afternoon"}
+
+
+def normalize_slot(raw: Any, stop_type: str) -> str:
+    value = str(raw or "").strip()
+    if value in VALID_SLOTS:
+        return value
+    if value in SLOT_ALIASES:
+        return SLOT_ALIASES[value]
+    return SLOT_BY_TYPE.get(stop_type, "morning")
+
+
+def enrich_stops(
     stops: list[dict[str, Any]],
     resolved: dict[str, AmapPoi],
-    pace: str,
     anchor: AmapPoi | None = None,
 ) -> list[dict[str, Any]]:
-    """按停留时长与真实通勤推算每条的起始时刻。
+    """补上真实通勤时长，并校正市内转移的时长。
 
-    两条规则：
-    1. transfer 夹在两个已核实地点之间时，用真实驾车时长替换模型估的时长——
-       模型估的通勤系统性偏低，而这里恰好能拿到真值。
-    2. 紧跟移动条目的下一条不再单独计通勤，否则同一段路会被算两次
-       （实测：三河古镇返程既算了 transfer 的 90 分钟，又加了 47 分钟真实通勤）。
+    这里**不再推算时刻**。曾经由代码累加出 startTime，但四个输入里三个是估计值，
+    累加结果却以精确到分钟的样子呈现；更糟的是会算出「14:59 逛夜市」这类
+    语义错误。时段改由模型判断，通勤时长退居为一条展示信息。
     """
     pois = [resolved.get((stop.get("name") or "").strip()) for stop in stops]
     durations = [max(int(stop.get("duration_min") or 60), 10) for stop in stops]
 
-    # 规则 1：市内转移用真实驾车时长校正。跨城的 flight/train 无法用驾车路线衡量，保持原值
+    # 市内转移用真实驾车时长校正。跨城的 flight/train 无法用驾车路线衡量，保持模型给的值
     for index, stop in enumerate(stops):
         if stop.get("type") != "transfer":
             continue
-        # 当天第一条就是转移时，前面没有已核实地点——用住宿锚点当起点。
-        # 否则「市区 → 三河古镇」这类首条转移拿不到真实时长，只能采信模型估的 120 分钟。
+        # 当天第一条就是转移时，前面没有已核实地点——用住宿锚点当起点
         before = next((pois[j] for j in range(index - 1, -1, -1) if pois[j]), None) or anchor
         after = next((pois[j] for j in range(index + 1, len(pois)) if pois[j]), None)
         if before and after:
@@ -276,11 +291,6 @@ def build_time_axis(
             if real:
                 durations[index] = real
 
-    hour, minute = DAY_START_BY_PACE.get(pace, (8, 30))
-    cursor = hour * 60 + minute
-    # 从住宿片区出发，于是当天第一站也有通勤时间。
-    # 这顺带修掉了「模型漏写长途转移」——三河古镇距市区 40 公里，
-    # 没有锚点时那一天凭空从古镇开始，有锚点则显示为一段真实通勤。
     previous: AmapPoi | None = anchor
     previous_was_movement = False
     out: list[dict[str, Any]] = []
@@ -290,56 +300,15 @@ def build_time_axis(
         is_movement = stop.get("type") in MOVEMENT_TYPES
 
         transit: int | None = None
-        # 规则 2：上一条是移动条目的话，那段路已经计过时了
+        # 上一条是移动条目的话，那段路已经计过时了，不再重复
         if previous is not None and poi is not None and not previous_was_movement and not is_movement:
             transit = transit_minutes_between(previous, poi)
-            if transit:
-                cursor += transit
 
-        out.append({**stop, "_startMinutes": cursor, "_transitMinutes": transit,
-                    "_durationMin": durations[index]})
-        cursor += durations[index]
+        out.append({**stop, "_transitMinutes": transit, "_durationMin": durations[index]})
         if poi is not None:
             previous = poi
         previous_was_movement = is_movement
 
-    return out
-
-
-def _hhmm(total_minutes: int) -> str:
-    return f"{(total_minutes // 60) % 24:02d}:{total_minutes % 60:02d}"
-
-
-def resolve_stays(
-    plan: dict[str, Any], city: str, destination: str
-) -> dict[int, tuple[dict[str, Any], AmapPoi | None]]:
-    """核实每天的住宿片区。只认片区不认具体酒店——无法核实空房与价格。"""
-    wanted: dict[int, str] = {}
-    for index, day in enumerate(plan.get("days") or [], start=1):
-        stay = day.get("stay")
-        area = str((stay or {}).get("area") or "").strip() if isinstance(stay, dict) else ""
-        if area:
-            wanted[index] = area
-
-    if not wanted:
-        return {}
-
-    unique = sorted(set(wanted.values()))
-    with ThreadPoolExecutor(max_workers=4) as pool:
-        located = dict(pool.map(lambda a: (a, resolve_place(a, city, destination)), unique))
-
-    out: dict[int, tuple[dict[str, Any], AmapPoi | None]] = {}
-    for index, area in wanted.items():
-        poi = located.get(area)
-        stay = (plan["days"][index - 1] or {}).get("stay") or {}
-        out[index] = (
-            {
-                "area": area,
-                "location": {"lat": poi.lat, "lng": poi.lng} if poi else None,
-                "reason": str(stay.get("reason") or "") or None,
-            },
-            poi,
-        )
     return out
 
 
@@ -374,9 +343,7 @@ def to_itinerary(
         stay_info, stay_poi = (stays or {}).get(index, (None, None))
         # 前一晚住哪儿，决定这一天从哪里出发
         anchor_info, anchor_poi = (stays or {}).get(index - 1, (stay_info, stay_poi))
-        stops = build_time_axis(
-            day.get("stops") or [], resolved, payload.preferences.pace, anchor=anchor_poi
-        )
+        stops = enrich_stops(day.get("stops") or [], resolved, anchor=anchor_poi)
         city = str(day.get("city") or payload.destination)
         if city not in route:
             route.append(city)
@@ -390,7 +357,7 @@ def to_itinerary(
                 "id": f"{trip_id}_d{index}_{uuid4().hex[:6]}",
                 "title": label,
                 "stopType": _stop_type(stop.get("type")),
-                "startTime": _hhmm(stop["_startMinutes"]),
+                "timeSlot": normalize_slot(stop.get("time_slot"), str(stop.get("type") or "")),
                 "durationMin": stop["_durationMin"],
                 "cost": _ticket_cost(poi),
                 "optional": bool(stop.get("optional")),
@@ -408,6 +375,7 @@ def to_itinerary(
             })
 
         iso_date = dates[index - 1] if index - 1 < len(dates) else ""
+        planned = sum((item["durationMin"] + (item["transitMinutes"] or 0)) for item in items)
         weather = (weather_by_city.get(city) or {}).get(iso_date)
         days_out.append({
             "day": index,
@@ -416,6 +384,7 @@ def to_itinerary(
             "title": str(day.get("theme") or f"{city} Day {index}"),
             "weather": weather or NO_FORECAST,
             "stay": stay_info,
+            "plannedMinutes": planned,
             "items": items,
         })
 
@@ -538,5 +507,8 @@ def generate_itinerary(trip_id: str, payload: CreateTripPayload, on_progress: Pr
         if item.poiId or item.verification == "verified" or item.stopType in ("sight", "activity")
     ]
     verified = sum(1 for item in searchable if item.verification == "verified")
-    on_progress(96, f"生成完成，耗时 {elapsed}s，{verified}/{len(searchable)} 个地点已核实")
+    capacity = DAY_CAPACITY_BY_PACE.get(payload.preferences.pace, 720)
+    overloaded = [day.day for day in itinerary.days if day.plannedMinutes > capacity]
+    suffix = f"；第 {'、'.join(map(str, overloaded))} 天安排偏满" if overloaded else ""
+    on_progress(96, f"生成完成，耗时 {elapsed}s，{verified}/{len(searchable)} 个地点已核实{suffix}")
     return itinerary

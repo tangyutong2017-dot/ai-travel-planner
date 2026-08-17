@@ -9,8 +9,8 @@ import {
 import { ApiError } from "../../api/client";
 import { getJobStatus } from "../../api/jobs";
 import { WAnnotation, WBtn, WImgBox } from "../../components/ui/Primitives";
-import type { Itinerary, ItineraryItem, StopType } from "../../types/itinerary";
-import { STOP_TYPE_LABELS } from "../../types/itinerary";
+import type { Itinerary, ItineraryItem, StopType, TimeSlot } from "../../types/itinerary";
+import { STOP_TYPE_LABELS, TIME_SLOT_LABELS } from "../../types/itinerary";
 import { LOCAL_TRANSPORT_SHORT } from "../../types/trip";
 import { AttractionCard } from "./AttractionCard";
 import { RightPanel } from "./RightPanel";
@@ -24,7 +24,7 @@ function hasPendingGeneratedDays(itinerary: Itinerary | null) {
 type EditingItemState = {
   day: number;
   item: ItineraryItem;
-  form: Required<Pick<UpdateTripItemPayload, "title" | "startTime" | "durationMin" | "stopType" | "cost" | "reason">>;
+  form: Required<Pick<UpdateTripItemPayload, "title" | "timeSlot" | "durationMin" | "stopType" | "cost" | "reason">>;
 };
 
 export function PageWorkspace({
@@ -201,7 +201,7 @@ export function PageWorkspace({
       item,
       form: {
         title: item.title,
-        startTime: item.startTime,
+        timeSlot: item.timeSlot,
         durationMin: item.durationMin,
         stopType: item.stopType,
         cost: item.cost,
@@ -385,12 +385,18 @@ export function PageWorkspace({
                 />
               </label>
               <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
-                开始时间
-                <input
-                  value={editingItem.form.startTime}
-                  onChange={(event) => patchEditingForm({ startTime: event.target.value })}
+                时段
+                <select
+                  value={editingItem.form.timeSlot}
+                  onChange={(event) => patchEditingForm({ timeSlot: event.target.value as TimeSlot })}
                   className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-sky-400"
-                />
+                >
+                  {(Object.entries(TIME_SLOT_LABELS) as [TimeSlot, string][]).map(([key, label]) => (
+                    <option key={key} value={key}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
                 停留时长（分钟）

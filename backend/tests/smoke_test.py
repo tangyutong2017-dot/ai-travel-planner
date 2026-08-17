@@ -56,13 +56,15 @@ s, d = call("POST", f"/api/trips/{trip}/generate")
 job = d.get("jobId")
 check("触发生成返回 jobId", s == 200 and bool(job), f"{s} {d}")
 
+# 真实 agent 要调 LLM、联网搜索、逐个核实地点，实测 60~135 秒。
+# 此前占位生成是瞬时的，15 秒的轮询上限一直没暴露问题。
 final = None
-for _ in range(30):
+for _ in range(90):
     s, d = call("GET", f"/api/jobs/{job}")
     if d.get("status") in ("succeeded", "failed"):
         final = d
         break
-    time.sleep(0.5)
+    time.sleep(3)
 check("生成任务完成", final is not None and final["status"] == "succeeded", str(final))
 check("任务返回进度与文案", bool(final) and final.get("progress") == 100 and bool(final.get("message")), str(final))
 
@@ -77,12 +79,12 @@ d1 = detail["days"][0] if s == 200 and detail.get("days") else {}
 for field in ("day", "date", "city", "title", "weather", "stay", "items"):
     check(f"DayPlan 含 {field}", field in d1)
 it = d1.get("items", [{}])[0]
-for field in ("id", "title", "stopType", "startTime", "durationMin", "cost", "verification"):
+for field in ("id", "title", "stopType", "timeSlot", "durationMin", "cost", "verification"):
     check(f"ItineraryItem 含 {field}", field in it)
 
 # --- 手动编辑：改景点 (PRD 8.5 手动编辑) ---
 s, d = call("PATCH", f"/api/trips/{trip}/days/1/items/{it['id']}",
-            {"title": "宽窄巷子", "startTime": "10:00", "durationMin": 120, "cost": 80})
+            {"title": "宽窄巷子", "timeSlot": "afternoon", "durationMin": 120, "cost": 80})
 edited = None
 if s == 200:
     edited = next((i for i in d["days"][0]["items"] if i["id"] == it["id"]), None)

@@ -1,6 +1,6 @@
 import { StopThumb } from "../../components/ui/StopThumb";
 import type { ItineraryItem } from "../../types/itinerary";
-import { STOP_TYPE_LABELS, endTimeOf, formatDuration } from "../../types/itinerary";
+import { STOP_TYPE_LABELS, TIME_SLOT_LABELS, formatDuration } from "../../types/itinerary";
 
 export function AttractionCard({
   item,
@@ -30,8 +30,8 @@ export function AttractionCard({
             {STOP_TYPE_LABELS[item.stopType]}
           </span>
         </div>
-        <p className="text-xs font-mono text-slate-500 mt-1">
-          {item.startTime} - {endTimeOf(item.startTime, item.durationMin)}
+        <p className="mt-1 text-xs font-mono text-slate-500">
+          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-slate-600">{TIME_SLOT_LABELS[item.timeSlot]}</span>
         </p>
         {item.address && <p className="mt-1 truncate text-[10px] font-mono text-slate-400">地址 · {item.address}</p>}
         <div className="flex items-center gap-2 mt-2">

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { getTripDetail } from "../../api/trips";
 import { Divider, WBtn, WImgBox } from "../../components/ui/Primitives";
 import type { DayPlan, Itinerary } from "../../types/itinerary";
-import { STOP_TYPE_LABELS, endTimeOf, formatDuration } from "../../types/itinerary";
+import { STOP_TYPE_LABELS, TIME_SLOT_LABELS, formatDuration } from "../../types/itinerary";
 import { LOCAL_TRANSPORT_SHORT } from "../../types/trip";
 
 type OutputPageId = "cover" | number;
@@ -166,9 +166,7 @@ function DayOutputPage({
                     {/* 地址：带着这份 PDF 出门时最需要的信息，此前只在工作区显示 */}
                     {item.address && <p className="text-[10px] font-mono text-slate-400 mt-0.5">{item.address}</p>}
                     <div className="flex items-center gap-3 mt-0.5 text-[11px] font-mono text-slate-500">
-                      <span>
-                        {item.startTime}-{endTimeOf(item.startTime, item.durationMin)}
-                      </span>
+                      <span>{TIME_SLOT_LABELS[item.timeSlot]}</span>
                       <span>· 约 {formatDuration(item.durationMin)}</span>
                       <span>· {item.cost === 0 ? "免费" : `¥ ${item.cost}`}</span>
                     </div>

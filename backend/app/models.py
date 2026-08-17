@@ -125,12 +125,22 @@ NoteKind = Literal["assumption", "alert"]
 # manual = 用户手工添加或改过；placeholder = agent 未接入时的占位条目。
 Verification = Literal["verified", "unverified", "manual", "placeholder"]
 
+# 时段取代精确时刻。
+#
+# 曾经由代码推算 startTime：起始时刻按节奏拍一个固定值，再累加模型估的停留时长
+# 与高德实测通勤。四个数里三个是估计，累加出的「13:16」却以精确到分钟的样子呈现，
+# 属于用确定的形式包装不确定的内容。
+#
+# 更糟的是它会算出语义上的错误：实测有一条「14:59 罍街夜市」——夜市下午三点去。
+# 「夜市该晚上」是语义判断，模型天生就懂；时刻是算术，算术不懂。
+TimeSlot = Literal["dawn", "morning", "noon", "afternoon", "evening", "night"]
+
 
 class ItineraryItem(BaseModel):
     id: str
     title: str
     stopType: StopType
-    startTime: str
+    timeSlot: TimeSlot
     # 时长与通勤都存分钟数：校验器无法从 "2h" / "地铁 15 分钟" 这类展示文本算时间闭合。
     # endTime 与 durationLabel 均可由此派生，不再单独存储。
     durationMin: int = Field(ge=0)
@@ -151,7 +161,7 @@ class ItineraryItem(BaseModel):
 
 class UpdateItineraryItemPayload(BaseModel):
     title: str | None = None
-    startTime: str | None = None
+    timeSlot: TimeSlot | None = None
     durationMin: int | None = Field(default=None, ge=0)
     stopType: StopType | None = None
     cost: int | None = Field(default=None, ge=0)
@@ -184,6 +194,8 @@ class DayPlan(BaseModel):
     generationStatus: DayGenerationStatus = "finalized"
     weather: DayWeather
     stay: Stay | None = None
+    # 当日占用分钟数（Σ停留 + Σ通勤）。不排时刻也要知道这天塞不塞得下
+    plannedMinutes: int = 0
     items: list[ItineraryItem]
 
 

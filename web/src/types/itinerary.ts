@@ -13,6 +13,22 @@ export type NoteKind = "assumption" | "alert";
  *  manual = 用户手工添加或改过；placeholder = agent 未接入时的占位条目。 */
 export type Verification = "verified" | "unverified" | "manual" | "placeholder";
 
+/** 时段取代精确时刻。
+ *
+ * 曾由代码累加推算 startTime——起始时刻按节奏拍定，再叠加模型估的停留时长与
+ * 高德实测通勤。四个输入里三个是估计，结果却精确到分钟；更糟的是会算出
+ * 「14:59 逛夜市」这类语义错误。时段是判断题，交给模型。 */
+export type TimeSlot = "dawn" | "morning" | "noon" | "afternoon" | "evening" | "night";
+
+export const TIME_SLOT_LABELS: Record<TimeSlot, string> = {
+  dawn: "清晨",
+  morning: "上午",
+  noon: "中午",
+  afternoon: "下午",
+  evening: "傍晚",
+  night: "晚上",
+};
+
 export const STOP_TYPE_LABELS: Record<StopType, string> = {
   sight: "景点",
   food: "餐饮",
@@ -28,7 +44,7 @@ export type ItineraryItem = {
   id: string;
   title: string;
   stopType: StopType;
-  startTime: string;
+  timeSlot: TimeSlot;
   /** 分钟数。endTime 与「约 2h」这类展示文本都由它派生，不单独存储。 */
   durationMin: number;
   cost: number;
@@ -61,6 +77,8 @@ export type DayPlan = {
   generationStatus?: "pending" | "generating" | "preview" | "finalized" | "failed";
   weather: { icon: string; desc: string; range: string; tip?: string };
   stay?: Stay | null;
+  /** 当日占用分钟数（Σ停留 + Σ通勤）。不排时刻也要知道这天塞不塞得下 */
+  plannedMinutes?: number;
   items: ItineraryItem[];
 };
 
@@ -100,13 +118,4 @@ export function formatDuration(minutes: number): string {
   if (h && m) return `${h}h${m}m`;
   if (h) return `${h}h`;
   return `${m}m`;
-}
-
-/** startTime + durationMin → 结束时刻。取代原先存库的 endTime。 */
-export function endTimeOf(startTime: string, durationMin: number): string {
-  const [h, m] = startTime.split(":").map(Number);
-  if (Number.isNaN(h) || Number.isNaN(m)) return startTime;
-  const total = h * 60 + m + durationMin;
-  const hh = Math.floor(total / 60) % 24;
-  return `${String(hh).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }

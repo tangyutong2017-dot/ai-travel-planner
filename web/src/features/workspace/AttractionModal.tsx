@@ -1,7 +1,7 @@
 import { Divider, WAnnotation, WBtn } from "../../components/ui/Primitives";
 import { StopThumb } from "../../components/ui/StopThumb";
 import type { ItineraryItem } from "../../types/itinerary";
-import { STOP_TYPE_LABELS, endTimeOf, formatDuration } from "../../types/itinerary";
+import { STOP_TYPE_LABELS, TIME_SLOT_LABELS, formatDuration } from "../../types/itinerary";
 
 export function ModalAttraction({ item, onClose }: { item: ItineraryItem; onClose: () => void }) {
   const VERIFICATION_LABELS: Record<string, string> = {
@@ -12,7 +12,7 @@ export function ModalAttraction({ item, onClose }: { item: ItineraryItem; onClos
   };
 
   const detailRows = [
-    ["游览时间", `${item.startTime} - ${endTimeOf(item.startTime, item.durationMin)}`],
+    ["时段", TIME_SLOT_LABELS[item.timeSlot]],
     ["建议停留", formatDuration(item.durationMin)],
     ["费用", item.cost === 0 ? "免费" : `¥${item.cost}`],
     ["地址", item.address || "暂无地址"],

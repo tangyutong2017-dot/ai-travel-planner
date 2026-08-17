@@ -5,6 +5,8 @@
 - 不要通勤时间与具体时刻      → 模型系统性低估（最严重 5 分 vs 实际 100 分），
                               且删掉这两个字段带来 4.5 倍提速
 - 节奏需量化                  → 否则模型把「慢节奏」理解成每天 6 站 11.5 小时
+- 时段而非精确时刻            → 由代码累加推算出的时刻会算出「14:59 逛夜市」这类
+                              语义错误；时段是判断题，模型比算术在行
 - 交通必须作为条目            → 两个模型都漏掉返程
 """
 
@@ -79,7 +81,11 @@ SYSTEM_PROMPT = """你是旅行行程规划师。
 
 其余要求：
 - 同一天的地点应集中在同一片区，不要跨区往返
-- 不要输出具体时刻，也不要估算通勤时间——这两项由系统用地图 API 计算
+- 不要估算市内通勤时间——系统会用地图 API 算
+- 每条给 time_slot 时段，不要给具体时刻：
+  dawn 清晨 / morning 上午 / noon 中午 / afternoon 下午 / evening 傍晚 / night 晚上
+  时段要符合常识：夜市与酒吧在 night，看日落在 evening，看日出在 dawn，
+  正餐在 noon 或 night，早班机在 dawn 或 morning
 - note 写实用提示：是否需预约、门票优惠、无障碍设施、注意事项
 - 价格与时刻类信息请注明「以现场为准」，因为网络信息可能过时"""
 
@@ -124,6 +130,7 @@ def build_user_prompt(payload: CreateTripPayload) -> str:
 {"title":"行程标题","days":[{"day":1,"theme":"当日主题","stops":[
  {"name":"纯地点名或空字符串","label":"展示文案",
   "type":"sight|food|activity|rest|flight|train|transfer|hotel",
+  "time_slot":"dawn|morning|noon|afternoon|evening|night",
   "duration_min":120,"reason":"为什么这样安排","note":"预约/优惠/无障碍等实用提示",
   "optional":false}],
   "stay":{"area":"住宿片区名","reason":"为什么住这里"}}],

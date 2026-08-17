@@ -1,4 +1,4 @@
-import type { Itinerary, StopType } from "../types/itinerary";
+import type { Itinerary, StopType, TimeSlot } from "../types/itinerary";
 import type { CreateTripPayload, CreateTripResponse, GetTripsParams, Trip, TripListResponse } from "../types/trip";
 import { apiDelete, apiGet, apiPatch, apiPost } from "./client";
 
@@ -60,7 +60,7 @@ export async function deleteTripItem(tripId: string, day: number, itemId: string
 
 export type UpdateTripItemPayload = {
   title?: string;
-  startTime?: string;
+  timeSlot?: TimeSlot;
   durationMin?: number;
   stopType?: StopType;
   cost?: number;
