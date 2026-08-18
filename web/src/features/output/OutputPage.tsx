@@ -41,7 +41,7 @@ function firstPhoto(itinerary: Itinerary): string | undefined {
 function Sheet({ visible, children }: { visible: boolean; children: ReactNode }) {
   return (
     <div
-      className={`print-page mx-auto mb-6 w-[794px] bg-white shadow-xl shadow-slate-300/40 ${visible ? "block" : "hidden"}`}
+      className={`print-page mx-auto mb-6 w-[794px] bg-white shadow-xl shadow-slate-300/40 print:m-0 print:w-full print:shadow-none ${visible ? "block" : "hidden"}`}
       style={{ minHeight: "1123px" }}
     >
       {children}
@@ -310,9 +310,9 @@ export function PageOutput({ tripId, onBack }: { tripId: string; onBack: () => v
   const activeIndex = pages.findIndex((page) => page.id === activePage);
 
   return (
-    <div className="flex-1 flex overflow-hidden bg-slate-100">
+    <div className="flex-1 flex overflow-hidden bg-slate-100 print:block print:overflow-visible print:bg-white">
       {/* 侧栏与工具条都不进打印 */}
-      <div className="hidden w-44 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex">
+      <div className="hidden w-44 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex print:!hidden">
         <div className="border-b border-slate-100 p-4">
           <p className="text-[10px] uppercase tracking-widest text-slate-400">输出方案</p>
           <p className="mt-1 text-xs text-slate-600">共 {pages.length} 页</p>
@@ -349,8 +349,8 @@ export function PageOutput({ tripId, onBack }: { tripId: string; onBack: () => v
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
-        <div className="flex items-center justify-between border-b border-slate-200 bg-white/80 px-6 py-2.5 backdrop-blur">
+      <div className="flex-1 overflow-auto print:overflow-visible">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-white/80 px-6 py-2.5 backdrop-blur print:hidden">
           <p className="text-[11px] text-slate-500">只读预览 · 如需修改请返回工作区</p>
           <div className="flex gap-2">
             <button
@@ -371,7 +371,7 @@ export function PageOutput({ tripId, onBack }: { tripId: string; onBack: () => v
         </div>
 
         {/* print-root：打印时只有这棵子树可见 */}
-        <div className="print-root px-6 py-8">
+        <div className="print-root px-6 py-8 print:p-0">
           <CoverSheet itinerary={itinerary} visible={activePage === "cover"} />
           {itinerary.days.map((day, index) => (
             <DaySheet key={day.day} itinerary={itinerary} day={day} visible={activePage === index} />

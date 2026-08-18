@@ -48,31 +48,24 @@ textarea:focus-visible {
 }
 
 /* ── 输出页打印规则 ──
-   屏幕上输出页是翻页预览（一次只渲染当前页），但 window.print() 会打印
-   整个文档——若不在打印时把全部页显示出来，导出的 PDF 只有当前一页。 */
+
+   只放纸张与分页；「哪些元素不打印」「哪些容器要解开高度限制」用 Tailwind 的
+   print: 变体在 JSX 里逐处标注——比在这里写复杂选择器去猜结构可靠得多。 */
 @media print {
   @page {
     size: A4;
     margin: 0;
   }
 
-  /* 打印时只留纸面，其余一律隐藏 */
-  body * {
-    visibility: hidden;
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
   }
 
-  .print-root,
-  .print-root * {
-    visibility: visible;
-  }
-
-  .print-root {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-  }
-
-  /* 屏幕上被翻页隐藏的页，打印时全部显示 */
+  /* 屏幕上输出页是翻页预览（一次只渲染当前页），但 window.print() 打印整个
+     文档——不把其余页展开，导出的 PDF 只有当前一张 */
   .print-page {
     display: block !important;
     page-break-after: always;
@@ -90,7 +83,7 @@ textarea:focus-visible {
     page-break-inside: avoid;
   }
 
-  /* 浏览器默认不打印背景色与图片，会让版面塌掉 */
+  /* 浏览器默认不打印背景色与图片，不开这个版面会塌 */
   .print-root * {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;

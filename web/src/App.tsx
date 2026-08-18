@@ -167,12 +167,14 @@ export default function App() {
 
   return (
     <div
-      className="flex flex-col h-screen bg-gray-50 relative overflow-hidden"
+      className="flex flex-col h-screen bg-gray-50 relative overflow-hidden print:block print:h-auto print:overflow-visible"
       style={{ fontFamily: "'Inter', sans-serif" }}
     >
-      <TopNav title={topNavTitle} />
+      <div className="print:hidden">
+        <TopNav title={topNavTitle} />
+      </div>
 
-      <div className="flex-1 flex overflow-hidden relative">
+      <div className="flex-1 flex overflow-hidden relative print:block print:overflow-visible">
         <LeftSidebar
           current={currentNav(route)}
           onNavigate={navigateFromSidebar}
@@ -181,7 +183,7 @@ export default function App() {
           onOpenTrip={(tripId) => navigateTo({ page: "workspace", tripId })}
         />
 
-        <div className="flex-1 flex overflow-hidden relative">
+        <div className="flex-1 flex overflow-hidden relative print:block print:overflow-visible">
           {(route.page === "trips" || route.page === "newTrip") && (
             <PageMyTrips
               onCreate={openWizard}

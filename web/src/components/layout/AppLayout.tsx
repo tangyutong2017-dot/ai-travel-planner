@@ -57,7 +57,7 @@ export function LeftSidebar({
   onOpenTrip: (tripId: string) => void;
 }) {
   return (
-    <div className="w-56 border-r border-slate-200 bg-white/80 backdrop-blur-xl flex flex-col shrink-0 overflow-y-auto">
+    <div className="w-56 border-r border-slate-200 bg-white/80 backdrop-blur-xl flex flex-col shrink-0 overflow-y-auto print:hidden">
       {/* Create trip CTA */}
       <div className="p-4 border-b border-slate-100">
         <button
