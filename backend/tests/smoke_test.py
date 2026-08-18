@@ -11,10 +11,12 @@
 import json
 import time
 import urllib.parse
+import os
 import urllib.request
 import urllib.error
 
-BASE = "http://127.0.0.1:8000"
+# 可指向另一个端口，以便在不打断已在运行的开发服务的情况下测新代码
+BASE = os.environ.get("SMOKE_BASE_URL", "http://127.0.0.1:8000")
 results = []
 
 
@@ -111,6 +113,31 @@ check("修改的费用已保存", edited is not None and edited.get("cost") == 8
 s, d = call("DELETE", f"/api/trips/{trip}/days/1/items/{it['id']}")
 check("删除景点成功", s == 200, f"{s} {d}")
 check("删除后该项目消失", s == 200 and all(i["id"] != it["id"] for i in d["days"][0]["items"]), "")
+
+# --- 撤销 (编辑 Agent 立项规划 §5) ---
+# 上面刚做了「改景点」「删景点」两次编辑，此处应能逐级撤回。
+# 这一段同时是路由级的存在性检查：路由函数体里的名字是延迟绑定的，
+# 少 import 一个函数时 `import app.main` 照样通过，只有真正打接口才会炸。
+s, d = call("GET", f"/api/trips/{trip}/undo")
+check("可查撤销状态", s == 200 and d.get("remaining", 0) >= 2, f"{s} {d}")
+
+s, d = call("POST", f"/api/trips/{trip}/undo")
+restored = d.get("itinerary") if s == 200 else None
+check("撤销删除：条目回来了", s == 200 and restored is not None
+      and any(i["id"] == it["id"] for i in restored["days"][0]["items"]), f"{s}")
+
+s, d = call("POST", f"/api/trips/{trip}/undo")
+restored = d.get("itinerary") if s == 200 else None
+back = next((i for i in restored["days"][0]["items"] if i["id"] == it["id"]), None) if restored else None
+check("撤销修改：标题与费用一并还原",
+      back is not None and back["title"] != "宽窄巷子" and back.get("cost") != 80, str(back))
+
+s, d = call("GET", f"/api/trips/{trip}/undo")
+check("撤尽后 remaining 归零", s == 200 and d.get("remaining") == 0, f"{s} {d}")
+s, d = call("POST", f"/api/trips/{trip}/undo")
+check("无可撤销时返回 409", s == 409, f"{s} {d}")
+s, d = call("POST", "/api/trips/no_such_trip/undo")
+check("撤销不存在的行程返回 409", s == 409, f"{s} {d}")
 
 # --- 重命名行程 ---
 s, d = call("PATCH", f"/api/trips/{trip}", {"name": "成都三日测试"})

@@ -18,10 +18,23 @@ from .models import (
     Trip,
     TripListResponse,
     TripStatus,
+    UndoResult,
     UpdateItineraryItemPayload,
     UpdateTripPayload,
 )
-from .repository import create_trip, delete_itinerary_item, delete_trip, get_itinerary, get_trip, list_trips, seed_initial_data, update_itinerary_item, update_trip_name
+from .repository import (
+    create_trip,
+    delete_itinerary_item,
+    delete_trip,
+    get_itinerary,
+    get_trip,
+    list_trips,
+    seed_initial_data,
+    undo_count,
+    undo_last_edit,
+    update_itinerary_item,
+    update_trip_name,
+)
 
 
 @asynccontextmanager
@@ -145,6 +158,22 @@ def update_trip_item_route(
         raise HTTPException(status_code=404, detail="没有找到这个行程项目")
 
     return updated
+
+
+@app.get("/api/trips/{trip_id}/undo", response_model=UndoResult)
+def get_undo_state_route(trip_id: str, db: Session = Depends(get_db)) -> UndoResult:
+    return UndoResult(remaining=undo_count(db, trip_id))
+
+
+@app.post("/api/trips/{trip_id}/undo", response_model=UndoResult)
+def undo_trip_edit_route(trip_id: str, db: Session = Depends(get_db)) -> UndoResult:
+    restored = undo_last_edit(db, trip_id)
+    if not restored:
+        # 没有可撤销的改动与行程不存在是两回事，但对调用方是同一种处置：
+        # 按钮置灰。合成一个 409 比让前端区分两种 404 更省事。
+        raise HTTPException(status_code=409, detail="没有可撤销的改动")
+
+    return UndoResult(remaining=undo_count(db, trip_id), itinerary=restored)
 
 
 @app.get("/api/trips/{trip_id}/days/{day_number}/map.png")

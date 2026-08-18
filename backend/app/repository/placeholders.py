@@ -98,7 +98,7 @@ def seed_initial_data(db: Session) -> None:
             attraction_count=trip.attractionCount,
         )
         db.add(record)
-        save_itinerary(db, trip.id, create_seed_itinerary(trip), commit=False)
+        save_itinerary(db, trip.id, create_seed_itinerary(trip), commit=False, snapshot_label=None)
 
     db.commit()
 

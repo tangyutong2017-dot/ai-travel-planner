@@ -209,6 +209,16 @@ class Itinerary(BaseModel):
     days: list[DayPlan]
 
 
+class UndoResult(BaseModel):
+    """还能撤几步；POST 时附带撤销后的行程。
+
+    前端要在页面加载时就决定撤销按钮是否可用，所以 remaining 单独可查。
+    """
+
+    remaining: int
+    itinerary: Itinerary | None = None
+
+
 class AgentJob(BaseModel):
     jobId: str
     tripId: str

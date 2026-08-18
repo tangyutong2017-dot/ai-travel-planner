@@ -12,6 +12,7 @@ from ..orm_models import ItineraryRecord, TripRecord
 from .covers import cover_url_from_days
 from .mappers import count_major_itinerary_items, itinerary_from_record
 from .naming import now_iso
+from .revisions import snapshot_itinerary
 
 
 PLACEHOLDER_SOURCE = "placeholder"
@@ -144,7 +145,7 @@ def delete_itinerary_item(db: Session, trip_id: str, day_number: int, item_id: s
         return None
 
     updated_itinerary = itinerary.model_copy(update={"days": updated_days})
-    save_itinerary(db, trip_id, updated_itinerary)
+    save_itinerary(db, trip_id, updated_itinerary, snapshot_label="删除条目")
     return updated_itinerary
 
 
@@ -185,11 +186,29 @@ def update_itinerary_item(
         return None
 
     updated_itinerary = itinerary.model_copy(update={"days": updated_days})
-    save_itinerary(db, trip_id, updated_itinerary)
+    save_itinerary(db, trip_id, updated_itinerary, snapshot_label="编辑条目")
     return updated_itinerary
 
 
-def save_itinerary(db: Session, trip_id: str, itinerary: Itinerary, commit: bool = True) -> None:
+def save_itinerary(
+    db: Session,
+    trip_id: str,
+    itinerary: Itinerary,
+    commit: bool = True,
+    *,
+    snapshot_label: str | None = "编辑",
+) -> None:
+    """写入行程。默认在覆写前留一份撤销快照。
+
+    快照默认开启、由调用方显式关掉，而不是反过来——这样新增的编辑路径自动获得
+    撤销能力。忘记关掉最多是多一个无用的撤销点，忘记打开则是用户的改动撤不回来。
+
+    传 None 关闭快照的三处：首次生成（撤销回占位行程没有意义）、种子数据、
+    以及撤销本身（否则反复点撤销会在两个状态间来回横跳）。
+    """
+    if snapshot_label:
+        snapshot_itinerary(db, trip_id, snapshot_label)
+
     record = db.get(ItineraryRecord, trip_id)
     payload = {
         "origin_city": itinerary.originCity,

@@ -47,6 +47,10 @@ from .itineraries import (  # noqa: F401
     save_itinerary,
     update_itinerary_item,
 )
+from .revisions import (  # noqa: F401
+    undo_count,
+    undo_last_edit,
+)
 from .jobs import (  # noqa: F401
     create_agent_job,
     get_agent_job,
@@ -81,6 +85,8 @@ __all__ = [
     "make_trip_id",
     "now_iso",
     "save_itinerary",
+    "undo_count",
+    "undo_last_edit",
     "seed_initial_data",
     "summarize_trips",
     "trip_date_sort_value",

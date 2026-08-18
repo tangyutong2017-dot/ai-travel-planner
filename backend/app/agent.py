@@ -80,7 +80,8 @@ def run_generation_job(job_id: str) -> None:
             itinerary = create_placeholder_itinerary(job.tripId, payload)
 
         update_agent_job(db, job_id, "running", 98, "正在保存行程并同步工作区")
-        save_itinerary(db, job.tripId, itinerary)
+        # 首次生成不留撤销点——撤销回占位行程没有意义
+        save_itinerary(db, job.tripId, itinerary, snapshot_label=None)
 
         update_agent_job(
             db,

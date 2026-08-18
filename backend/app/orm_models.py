@@ -50,6 +50,26 @@ class ItineraryRecord(Base):
     trip: Mapped[TripRecord] = relationship(back_populates="itinerary")
 
 
+class ItineraryRevisionRecord(Base):
+    """一次编辑前的行程快照，用于撤销。
+
+    只存 days_json——所有编辑操作（改/删/加/移条目）都只动这一列，
+    标题、同行人、备注不在编辑范围内。
+
+    走快照而非逆操作：days_json 是单个 JSONB 列，整份行程就是一个 blob，
+    复制一列即可。逆操作要为每个操作各写一个并保证正确（delete 还得记住
+    被删条目的原始位置），出错面大得多。
+    """
+
+    __tablename__ = "itinerary_revisions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    trip_id: Mapped[str] = mapped_column(ForeignKey("trips.id", ondelete="CASCADE"), index=True)
+    days_json: Mapped[list] = mapped_column(JSONB)
+    label: Mapped[str] = mapped_column(String(120), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
 class AgentJobRecord(Base):
     __tablename__ = "agent_jobs"
 
