@@ -1,0 +1,18 @@
+# GitHub Pages 配置。
+# 目的：让 Pages 直接用根目录的 README.md 当首页 —— 不维护第二份内容。
+#
+# 这个仓库根目录没有 index.html（React 应用的入口在 web/ 下），所以 Jekyll
+# 会自动退回用 README.md 渲染首页，不需要像 pi-desktop 那样额外排除它。
+
+theme: jekyll-theme-cayman
+
+title: AI 行程规划
+description: 一句话生成可核实的旅行行程，再用一句话改它 · React + FastAPI + DeepSeek + 高德地图
+
+# 只有 README 和 docs/ 需要出现在站点里，其余源码一律不参与构建。
+# 不排除的话 Jekyll 会去解析 node_modules 与 .venv，构建会非常慢甚至失败。
+exclude:
+  - web/
+  - backend/
+  - figma/
+  - .github/

@@ -1,0 +1,82 @@
+<!--
+  GitHub 站内 markdown 自带 mermaid 渲染，Jekyll 没有 —— 不加这段，
+  README 里的架构图与时序图在 Pages 上会显示成代码块。
+  cayman 主题的 default 布局留了 head-custom 这个插入点。
+-->
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+
+  // Kramdown 把 ```mermaid 编译成 <pre><code class="language-mermaid">，
+  // 换成 mermaid 认的 <div class="mermaid">
+  for (const code of document.querySelectorAll("code.language-mermaid")) {
+    const holder = document.createElement("div");
+    holder.className = "mermaid";
+    holder.textContent = code.textContent;
+    (code.closest("pre") ?? code).replaceWith(holder);
+  }
+
+  mermaid.initialize({ startOnLoad: true, theme: "neutral" });
+
+  // cayman 的页头只有一个「View on GitHub」，项目页因此是死路 ——
+  // 补一个返回作品集主页的按钮。只影响 Pages，README 不受影响。
+  const header = document.querySelector(".page-header");
+  if (header) {
+    const home = document.createElement("a");
+    home.href = "https://tangyutong2017-dot.github.io/";
+    home.className = "btn";
+    home.textContent = "← 作品集";
+    const firstBtn = header.querySelector(".btn");
+    header.insertBefore(home, firstBtn);
+  }
+
+  // 演示视频：GitHub 站内会把那行裸链接自动渲染成播放器，Jekyll 不会，
+  // 于是 Pages 上就露出一长串 URL。这里换成一个按钮 —— 只影响 Pages，
+  // README 里仍然是裸链接，GitHub 那边的播放器不受影响。
+  // Kramdown 不会把裸 URL 转成 <a>，所以这里找的是「整段就是那条 URL」的段落。
+  for (const p of document.querySelectorAll("p")) {
+    const url = p.textContent.trim();
+    if (!/^https:\/\/github\.com\/user-attachments\/assets\/\S+$/.test(url)) continue;
+
+    const button = document.createElement("a");
+    button.className = "demo-button";
+    button.href = url;
+    button.target = "_blank";
+    button.rel = "noopener";
+    button.textContent = "▶  观看演示";
+    p.replaceWith(button);
+  }
+</script>
+
+<style>
+  /* 图较宽，窄屏下让它自己横向滚动，别把整页撑破 */
+  .mermaid { overflow-x: auto; }
+
+  /* mermaid 生成的 svg 带 height:100%，在打印布局里会塌成 0 高度，
+     导致后面的内容压到图上面。强制 auto。 */
+  .mermaid svg { height: auto !important; max-width: 100% !important; }
+
+  @media print {
+    /* 打印时不要滚动容器，否则超出部分直接被裁掉 */
+    .mermaid { overflow: visible; }
+    .mermaid, .mermaid svg, img, table { break-inside: avoid; page-break-inside: avoid; }
+    img { max-width: 100% !important; }
+  }
+
+  .demo-button {
+    display: inline-block;
+    padding: 12px 22px;
+    border: 1px solid rgba(0, 0, 0, 0.14);
+    border-radius: 10px;
+    background: #fff;
+    color: #1C1A18 !important;
+    font-weight: 600;
+    text-decoration: none !important;
+    transition: border-color 0.18s, transform 0.18s, box-shadow 0.18s;
+  }
+
+  .demo-button:hover {
+    border-color: rgba(0, 0, 0, 0.3);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 20px -12px rgba(0, 0, 0, 0.5);
+  }
+</style>
