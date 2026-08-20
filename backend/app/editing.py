@@ -17,8 +17,15 @@ from uuid import uuid4
 
 from pydantic import ValidationError
 
-from .amap import AmapPoi
-from .generation import DEEPSEEK_MODEL, _post, _ticket_cost, destination_center, resolve_place
+from .amap import AmapPoi, driving_route, search_around, search_pois
+from .generation import (
+    DEEPSEEK_MODEL,
+    MOVEMENT_TYPES,
+    _post,
+    _ticket_cost,
+    destination_center,
+    resolve_place,
+)
 from .models import (
     EditOp,
     InsertItineraryItemPayload,
@@ -124,6 +131,38 @@ def build_verified_item(
 # 理由不是时延，而是副作用——模型输出存在结构不稳定，用户只想换顿午饭，
 # 第三天却被悄悄改了，这类改动没有任何提示。
 
+SEARCH_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "search_places",
+        "description": (
+            "在高德地图上搜真实存在的地点。要新增餐厅、景点等地方时**必须先用它搜**，"
+            "然后从返回结果里原样复制名称——不要凭记忆写店名。"
+            "返回空列表表示那一带高德没有收录，这时如实告诉用户搜不到，不要编一个名字。"
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "day": {
+                    "type": "integer",
+                    "description": "第几天。用来定位搜索中心——按当天已有条目的坐标搜周边",
+                },
+                "category": {
+                    "type": "string",
+                    "enum": ["food", "sight", "activity", "hotel"],
+                    "description": "要搜的品类",
+                },
+                "keyword": {
+                    "type": "string",
+                    "description": "可选。知道确切名字时填，例如「婺源博物馆」；找「附近有什么餐馆」时留空",
+                },
+            },
+            "required": ["day", "category"],
+        },
+    },
+}
+
+
 EDIT_TOOL = {
     "type": "function",
     "function": {
@@ -180,8 +219,13 @@ EDIT_SYSTEM_PROMPT = """你是行程编辑助手。用户会用自然语言提�
   以及「如果不是这个可以告诉我」。不要为此反问。
 - 位置不明确时自己定：新增条目按时段插到合理位置即可，不要问用户插在第几个。
 - 只有一种情况才反问：要求本身无法执行（例如要删的东西行程里根本没有）。
-- 新增地点时 title 只写地点名称，不要加修饰语、不要编造地址坐标价格——
-  系统会拿这个名字去高德核实，查不到就整条指令作废。写「李坑」而不是「李坑观景咖啡屋」。
+- **新增或替换地点前必须先调 search_places 搜一次**，再从返回结果里**原样复制**名称。
+  不要凭记忆写店名——你不知道当地有哪些店，编出来的名字高德查不到，整条指令会作废。
+  传 day 与 category 即可，系统会按那一天的位置搜周边；知道确切名字时才填 keyword。
+- 已经在行程里的著名景点可以直接引用，不必搜。
+- search_places 返回空列表，说明那一带高德没有收录。**如实告诉用户「附近没搜到」**，
+  不要退而求其次编一个名字——编出来的会被核实拦下，用户看到的是一句莫名其妙的报错。
+- 不要编造地址、坐标或价格——这些由系统从高德取。
 - reply 用一句话说明你做了什么，不要罗列选项。"""
 
 
@@ -217,39 +261,128 @@ class EditRejected(Exception):
     """整条指令被拒。全成功或全不动——部分执行会留下用户无法理解的中间状态。"""
 
 
+# 搜索最多来回两轮。一次搜不到合适的允许换个词再搜一次，再多就是在原地打转，
+# 而每轮都要多花一次模型往返加一次高德查询。
+MAX_SEARCH_ROUNDS = 2
+
+# 给模型看的候选条数。多了会把 prompt 撑大且选择困难，少了容易没有合适的。
+SEARCH_RESULT_LIMIT = 6
+
+
+def day_anchor(itinerary: Itinerary, day_number: int) -> tuple[float, float] | None:
+    """这一天的搜索中心：取当天第一个有坐标的条目。
+
+    退回目的地中心而不是直接放弃——多日行程里某天可能一个坐标都没有。
+    """
+    for day in itinerary.days:
+        if day.day != day_number:
+            continue
+        for item in day.items:
+            location = item.location or {}
+            if "lat" in location and "lng" in location:
+                return location["lat"], location["lng"]
+
+    center = destination_center(itinerary.destination)
+    return (center.lat, center.lng) if center else None
+
+
+def run_place_search(
+    itinerary: Itinerary, day_number: int, category: str, keyword: str = ""
+) -> list[dict[str, str]]:
+    """替模型查高德，只回名称与地址。
+
+    两条路：给了 keyword 就按名字查；没给就按当天坐标搜周边品类。后者是必需的——
+    高德的文本检索匹配名称而非类别，实测「篁岭 餐厅」「江湾 美食」都是 0 条，
+    「附近有什么餐馆」这类需求只能走周边检索。
+
+    坐标、POI id 不给模型——它只需要挑一个名字，剩下的由 build_verified_item
+    再查一次拿到。给多了徒增它编造坐标的机会。
+
+    搜不到就返回空列表，让模型如实告诉用户，而不是逼它编一个名字。
+    """
+    pois = []
+    try:
+        if keyword:
+            pois = search_pois(keyword, itinerary.destination, limit=SEARCH_RESULT_LIMIT)
+        if not pois:
+            anchor = day_anchor(itinerary, day_number)
+            if anchor:
+                pois = search_around(anchor[0], anchor[1], category, limit=SEARCH_RESULT_LIMIT)
+    except Exception:
+        logger.exception("对话编辑的地点搜索失败 day=%s category=%s keyword=%s", day_number, category, keyword)
+        return []
+
+    return [{"name": poi.name, "address": poi.address or ""} for poi in pois]
+
+
 def plan_edits(itinerary: Itinerary, message: str) -> tuple[list[EditOp], str]:
     """让模型把一句话翻成编辑操作。返回（操作列表，模型的话）。
 
+    模型可以先调 search_places 查真实地点再决定加什么——这一步是必要的：
+    模型不知道当地有哪些餐馆，凭记忆写店名必然编造（实测它给出过「篁岭天街」
+    「汪口茶馆」这类高德查不到的名字）。让它先看到真实候选，再原样复制名称。
+    这与生成链路让模型先联网搜索是同一个模式：LLM 判断，高德供事实。
+
     模型不调工具、只回文字是**正常路径**（澄清或说明做不到），此时操作列表为空。
     """
-    body = {
-        "model": DEEPSEEK_MODEL,
-        "messages": [
-            {"role": "system", "content": EDIT_SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": (
-                    f"当前行程：\n{json.dumps(slim_itinerary(itinerary), ensure_ascii=False)}"
-                    f"\n\n我的要求：{message}"
-                ),
-            },
-        ],
-        "tools": [EDIT_TOOL],
-        "temperature": 0.3,
-    }
+    messages: list[dict[str, Any]] = [
+        {"role": "system", "content": EDIT_SYSTEM_PROMPT},
+        {
+            "role": "user",
+            "content": (
+                f"当前行程：\n{json.dumps(slim_itinerary(itinerary), ensure_ascii=False)}"
+                f"\n\n我的要求：{message}"
+            ),
+        },
+    ]
 
-    # 实测单次 2.7~5.6 秒（生成是 60~135 秒，因为那要吐整份行程）。
-    # 60 秒超时留足余量，同时避免卡死请求线程。
-    data = _post(body, timeout=60)
-    choice = data["choices"][0]["message"]
-    calls = choice.get("tool_calls") or []
-    if not calls:
+    choice: dict[str, Any] = {}
+    args: dict[str, Any] | None = None
+
+    for round_index in range(MAX_SEARCH_ROUNDS + 1):
+        # 最后一轮收掉搜索工具，避免模型无限搜下去不给结果
+        tools = [EDIT_TOOL] if round_index == MAX_SEARCH_ROUNDS else [EDIT_TOOL, SEARCH_TOOL]
+
+        # 实测单次 3.9~6.4 秒（生成是 60~135 秒，因为那要吐整份行程）。
+        # 60 秒超时留足余量，同时避免卡死请求线程。
+        data = _post(
+            {"model": DEEPSEEK_MODEL, "messages": messages, "tools": tools, "temperature": 0.3},
+            timeout=60,
+        )
+        choice = data["choices"][0]["message"]
+        calls = choice.get("tool_calls") or []
+        if not calls:
+            return [], (choice.get("content") or "").strip()
+
+        search_calls = [c for c in calls if c.get("function", {}).get("name") == "search_places"]
+        if not search_calls:
+            try:
+                args = json.loads(calls[0]["function"]["arguments"])
+            except (json.JSONDecodeError, KeyError, IndexError) as exc:
+                raise EditRejected("没看懂要改什么，请换个说法再试一次") from exc
+            break
+
+        messages.append(choice)
+        for call in calls:
+            name = call.get("function", {}).get("name")
+            if name == "search_places":
+                call_args = json.loads(call["function"]["arguments"])
+                results = run_place_search(
+                    itinerary,
+                    int(call_args.get("day") or 1),
+                    str(call_args.get("category") or "food"),
+                    str(call_args.get("keyword") or ""),
+                )
+                logger.info("对话编辑搜索 %s → %d 条", call_args, len(results))
+                content = json.dumps(results, ensure_ascii=False)
+            else:
+                # 同一轮里混着别的工具调用。必须每个 tool_call 都回一条，
+                # 否则下一次请求会因缺少响应而被接口拒绝
+                content = "[]"
+            messages.append({"role": "tool", "tool_call_id": call["id"], "content": content})
+
+    if args is None:
         return [], (choice.get("content") or "").strip()
-
-    try:
-        args = json.loads(calls[0]["function"]["arguments"])
-    except (json.JSONDecodeError, KeyError, IndexError) as exc:
-        raise EditRejected("没看懂要改什么，请换个说法再试一次") from exc
 
     ops = []
     for raw in args.get("ops") or []:
@@ -290,6 +423,66 @@ def _describe_update(op: EditOp, title: str, patch: dict[str, Any]) -> str:
     return f"修改 D{op.day}「{title}」的" + "、".join(labels)
 
 
+def recompute_day_transit(
+    items: list[ItineraryItem], anchor: dict[str, float] | None = None
+) -> list[ItineraryItem]:
+    """重算一整天的段间通勤。
+
+    结构一变，后面每条的 transitMinutes 就都过期了——往 D2 中间插一顿午饭，
+    下一条算的还是「篁岭→江湾」，而实际起点已经变成那家餐厅。地图动线是按坐标
+    实时画的会自动跟上，通勤耗时却是烤进数据里的，不重算就是一个看着确定的错数。
+
+    语义与生成链路的 enrich_stops 保持一致：上一条是移动条目（航班/火车/转移）时
+    不再叠加段间通勤——那段路已经计过时了。
+
+    `anchor` 是前一晚的住宿坐标，用作当天第一条的起点——否则每天第一个景点的
+    通勤会凭空消失（生成链路本来是算的，重算时漏掉就成了倒退）。
+    """
+    updated: list[ItineraryItem] = []
+    previous_location: dict[str, float] | None = anchor
+    previous_was_movement = False
+
+    for item in items:
+        is_movement = item.stopType in MOVEMENT_TYPES
+        transit: int | None = None
+
+        if previous_location is not None and not previous_was_movement and not is_movement:
+            here, there = previous_location, item.location
+            if here and there:
+                try:
+                    route = driving_route(here, there)
+                    transit = route.duration_minutes if route else None
+                except Exception:
+                    # 路线查不到就留空。宁可不显示，也不留一个过期的数字
+                    transit = None
+
+        updated.append(item.model_copy(update={"transitMinutes": transit}))
+        if item.location:
+            previous_location = item.location
+        previous_was_movement = is_movement
+
+    return updated
+
+
+def relocate_patch(title: str, destination: str, center: AmapPoi | None) -> dict[str, Any]:
+    """标题换成了别的地方时，重新核实并给出该跟着变的字段。
+
+    核实得到就换成新地点的坐标；核实不到就把位置信息**全部清空**并标为未核实——
+    留着旧坐标比没有坐标更糟：条目看着已核实，地图却指向另一家店。
+    """
+    poi = resolve_place(title, destination, destination, center or destination_center(destination))
+    if poi and is_literal_match(title, poi):
+        return {
+            "location": {"lat": poi.lat, "lng": poi.lng},
+            "address": poi.address,
+            "poiId": poi.id,
+            "imageUrl": poi.image_url,
+            "verification": "verified",
+        }
+
+    return {"location": None, "address": None, "poiId": None, "imageUrl": None, "verification": "unverified"}
+
+
 def apply_ops(
     itinerary: Itinerary, ops: list[EditOp], center: AmapPoi | None = None
 ) -> tuple[Itinerary, list[str], list[str]]:
@@ -303,6 +496,8 @@ def apply_ops(
     days = {day.day: list(day.items) for day in itinerary.days}
     changes: list[str] = []
     touched: list[str] = []
+    # 哪几天的顺序或位置变了，最后要重算整天的通勤
+    restructured: set[int] = set()
 
     for op in ops:
         if op.day not in days:
@@ -330,6 +525,7 @@ def apply_ops(
             items.insert(insert_position(items, item, op.afterItemId), item)
             changes.append(_describe(op, item.title))
             touched.append(item.id)
+            restructured.add(op.day)
             continue
 
         index = next((i for i, existing in enumerate(items) if existing.id == op.itemId), None)
@@ -340,6 +536,7 @@ def apply_ops(
         if op.op == "delete":
             changes.append(_describe(op, items[index].title))
             items.pop(index)
+            restructured.add(op.day)
             continue
 
         patch = op.model_dump(
@@ -353,9 +550,26 @@ def apply_ops(
         if not patch:
             continue
 
+        # 改了标题就等于换了个地方，原来的坐标/地址/图片全都不再属于它。
+        # 实测模型会用 update 把「花海餐厅」改名成「花田人家农家菜」——若不处理，
+        # 条目会顶着新店名却带着旧店的经纬度，地图上指向错误位置。
+        if "title" in patch and current.location:
+            patch.update(relocate_patch(str(patch["title"]), itinerary.destination, center))
+            restructured.add(op.day)  # 换了地方，前后两段路都变了
+
         changes.append(_describe_update(op, current.title, patch))
         items[index] = current.model_copy(update=patch)
         touched.append(current.id)
+
+    # 结构变过的那几天重算通勤。只算变过的——每段都要打一次高德路线接口，
+    # 没动过的天没有理由重来一遍
+    stays = {day.day: day.stay for day in itinerary.days}
+    for day_number in restructured:
+        # 前一晚住哪儿，决定这一天从哪里出发
+        previous_stay = stays.get(day_number - 1)
+        days[day_number] = recompute_day_transit(
+            days[day_number], previous_stay.location if previous_stay else None
+        )
 
     updated_days = [day.model_copy(update={"items": days[day.day]}) for day in itinerary.days]
     return itinerary.model_copy(update={"days": updated_days}), changes, touched

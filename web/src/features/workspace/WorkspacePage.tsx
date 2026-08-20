@@ -14,6 +14,7 @@ import { STOP_TYPE_LABELS, TIME_SLOT_LABELS } from "../../types/itinerary";
 import { LOCAL_TRANSPORT_SHORT } from "../../types/trip";
 import { AttractionCard } from "./AttractionCard";
 import { RightPanel } from "./RightPanel";
+import { AiEditBar } from "./AiEditBar";
 
 function hasPendingGeneratedDays(itinerary: Itinerary | null) {
   if (!itinerary) return false;
@@ -49,6 +50,8 @@ export function PageWorkspace({
   const [reloadKey, setReloadKey] = useState(0);
   const [mutationMessage, setMutationMessage] = useState("");
   const [editingItem, setEditingItem] = useState<EditingItemState | null>(null);
+  // AI 刚改过哪几条。切换日期时不清——用户可能改的是别的天，切过去要能看见
+  const [highlightedIds, setHighlightedIds] = useState<string[]>([]);
 
   useEffect(() => {
     let ignore = false;
@@ -177,6 +180,13 @@ export function PageWorkspace({
   }
 
   const day = itinerary.days[activeDay] ?? itinerary.days[0];
+
+  const applyAiEdit = (updated: Itinerary) => {
+    setItinerary(updated);
+    // AI 可能删掉整天最后一项，也可能这趟改动后天数变少——activeDay 越界会白屏
+    setActiveDay((current) => Math.min(current, Math.max(updated.days.length - 1, 0)));
+    onTripChanged();
+  };
 
   const handleDeleteItem = async (item: ItineraryItem) => {
     const confirmed = window.confirm(`确定从第${day.day}天删除「${item.title}」吗？`);
@@ -334,6 +344,7 @@ export function PageWorkspace({
                 )}
                 <AttractionCard
                   item={item}
+                  highlighted={highlightedIds.includes(item.id)}
                   onClick={() => onOpenModal(item)}
                   onDelete={() => void handleDeleteItem(item)}
                   onEdit={() => openEditItem(item)}
@@ -341,22 +352,9 @@ export function PageWorkspace({
               </div>
             </div>
           ))}
-
-          <div className="mt-6 pt-4 border-t border-dashed border-slate-200">
-            <div className="mb-2 flex items-center justify-between">
-              <WAnnotation text="Editing Agent" />
-            </div>
-            <div className="mt-1 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 shadow-sm">
-              <WImgBox className="w-6 h-6 rounded-full shrink-0" label="" />
-              <div className="min-w-0">
-                <p className="text-xs font-medium text-slate-700">AI 调整功能正在重构</p>
-                <p className="mt-0.5 text-[10px] font-mono text-slate-400">
-                  当前保留手动编辑和删除；新的 Editing Agent 会在后续重新接入。
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
+
+        <AiEditBar tripId={tripId} onItineraryChange={applyAiEdit} onHighlight={setHighlightedIds} />
       </div>
 
       <RightPanel tripId={tripId} day={day} notes={itinerary.notes} onOutput={onOutput} />

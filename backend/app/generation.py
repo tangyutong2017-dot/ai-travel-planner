@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -482,11 +483,22 @@ def to_itinerary(
 
 
 def _ticket_cost(poi: AmapPoi | None) -> int:
-    """只采信高德给的数字票价。解析不出就记 0——不猜。"""
+    """只采信高德给的数字票价。解析不出就记 0——不猜。
+
+    必须按小数解析，不能只挑数字字符：高德的餐饮人均带两位小数（`'75.00'`），
+    剔掉小数点会得到 7500，把 75 元的农家菜标成 ¥7500。景点门票多是整数，
+    这个错一直没暴露，直到对话编辑能往行程里加餐馆才现形。
+    """
     if not poi or not poi.cost:
         return 0
-    digits = "".join(char for char in str(poi.cost) if char.isdigit())
-    return int(digits) if digits and len(digits) <= 4 else 0
+
+    match = re.search(r"\d+(?:\.\d+)?", str(poi.cost))
+    if not match:
+        return 0
+
+    value = round(float(match.group()))
+    # 上限挡住把电话号码之类的东西当价格。真实门票与人均都远低于此
+    return value if 0 < value <= 9999 else 0
 
 
 def fetch_weather(cities: list[str]) -> dict[str, dict[str, Any]]:

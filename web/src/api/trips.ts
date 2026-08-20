@@ -89,3 +89,29 @@ export async function updateTripItem(
 ): Promise<Itinerary> {
   return apiPatch<Itinerary, UpdateTripItemPayload>(`/api/trips/${tripId}/days/${day}/items/${itemId}`, payload);
 }
+
+/** 一次对话编辑的结果。changes 由后端依据实际执行成功的操作生成，不是模型写的。 */
+export type ChatEditResult = {
+  reply: string;
+  changes: string[];
+  changedItemIds: string[];
+  itinerary: Itinerary | null;
+  undoRemaining: number;
+};
+
+export type UndoResult = {
+  remaining: number;
+  itinerary: Itinerary | null;
+};
+
+export async function chatEditTrip(tripId: string, message: string): Promise<ChatEditResult> {
+  return apiPost<ChatEditResult, { message: string }>(`/api/trips/${tripId}/chat`, { message });
+}
+
+export async function getUndoState(tripId: string): Promise<UndoResult> {
+  return apiGet<UndoResult>(`/api/trips/${tripId}/undo`);
+}
+
+export async function undoTripEdit(tripId: string): Promise<UndoResult> {
+  return apiPost<UndoResult>(`/api/trips/${tripId}/undo`);
+}

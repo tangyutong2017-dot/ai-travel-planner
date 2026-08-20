@@ -216,6 +216,65 @@ def search_pois_once(keyword: str, city: str, limit: int = 5, timeout: float = 1
     return results
 
 
+# 高德 POI 分类码。文本检索做不了品类查询——实测「篁岭 餐厅」「江湾 美食」
+# 都是 0 条，因为 /place/text 匹配的是名称而不是类别。要「附近有什么餐馆」
+# 只能走周边检索。
+POI_CATEGORY_CODES = {
+    "food": "050000",  # 餐饮服务
+    "sight": "110000",  # 风景名胜
+    "activity": "080000",  # 体育休闲服务
+    "hotel": "100000",  # 住宿服务
+    "rest": "050000",
+}
+
+
+def search_around(
+    lat: float,
+    lng: float,
+    category: str,
+    radius_m: int = 5000,
+    limit: int = 6,
+    timeout: float = 12.0,
+) -> list[AmapPoi]:
+    """按坐标搜周边某一品类的 POI。
+
+    用于「在篁岭附近加个午饭」这类需求：模型不知道当地有哪些店，凭记忆写必然编造，
+    而按名称检索又查不出品类。给它一份真实候选，让它从里面挑。
+    """
+    if not AMAP_API_KEY:
+        raise AmapUnavailableError("AMAP_API_KEY is not configured")
+
+    _throttle()
+    response = httpx.get(
+        f"{AMAP_BASE_URL}/v5/place/around",
+        params={
+            "key": AMAP_API_KEY,
+            "location": f"{lng:.6f},{lat:.6f}",
+            "types": POI_CATEGORY_CODES.get(category, POI_CATEGORY_CODES["food"]),
+            "radius": max(min(radius_m, 50000), 500),
+            "sortrule": "distance",
+            "show_fields": "business,photos",
+            "page_size": min(max(limit, 1), 25),
+        },
+        timeout=timeout,
+    )
+    response.raise_for_status()
+    data = response.json()
+
+    if data.get("status") != "1":
+        raise AmapUnavailableError(data.get("info", "Amap request failed"))
+
+    results = []
+    for poi in data.get("pois") or []:
+        # 周边检索的结果本就来自高德，不再过 is_plausible_match——
+        # 那道判据是给「按名字查」用的，这里没有名字可比
+        parsed = amap_poi_from_payload(poi, "")
+        if parsed:
+            results.append(parsed)
+
+    return results[:limit]
+
+
 def amap_poi_from_payload(poi: dict, fallback_name: str) -> AmapPoi | None:
     location = poi.get("location") or ""
     if "," not in location:

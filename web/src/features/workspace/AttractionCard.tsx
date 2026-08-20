@@ -7,15 +7,20 @@ export function AttractionCard({
   onClick,
   onDelete,
   onEdit,
+  highlighted = false,
 }: {
   item: ItineraryItem;
   onClick: () => void;
   onDelete: () => void;
   onEdit: () => void;
+  /** AI 刚改过这一条。行程可能有十几项，不标出来用户不知道哪里变了。 */
+  highlighted?: boolean;
 }) {
   return (
     <div
-      className="rounded-lg border border-slate-200 bg-white p-3 flex gap-3 cursor-pointer hover:border-sky-200 hover:shadow-md hover:shadow-sky-100/70 transition-all"
+      className={`rounded-lg border bg-white p-3 flex gap-3 cursor-pointer hover:shadow-md hover:shadow-sky-100/70 transition-all ${
+        highlighted ? "border-emerald-400 ring-2 ring-emerald-200" : "border-slate-200 hover:border-sky-200"
+      }`}
       onClick={onClick}
     >
       {item.imageUrl ? (
