@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, get_args
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -130,6 +130,10 @@ Verification = Literal["verified", "unverified", "manual", "placeholder"]
 # 「夜市该晚上」是语义判断，模型天生就懂；时刻是算术，算术不懂。
 TimeSlot = Literal["dawn", "morning", "noon", "afternoon", "evening", "night"]
 
+# 时段的先后次序。直接从 TimeSlot 的定义顺序推导，不另抄一份——
+# 抄一份就多一处会跟枚举走样的地方。
+SLOT_ORDER = {slot: index for index, slot in enumerate(get_args(TimeSlot))}
+
 
 class ItineraryItem(BaseModel):
     id: str
@@ -150,6 +154,22 @@ class ItineraryItem(BaseModel):
     location: dict[str, float] | None = None
     poiId: str | None = None
     imageUrl: str | None = None
+
+
+class InsertItineraryItemPayload(BaseModel):
+    """新增一个条目。title 既是要核实的地名，也是展示名。
+
+    没有 location/address/poiId——那些一律由高德核实得来，不接受调用方传入，
+    否则就等于给「编造坐标」开了一道口子。
+    """
+
+    title: str = Field(min_length=1, max_length=120)
+    timeSlot: TimeSlot
+    stopType: StopType = "sight"
+    durationMin: int | None = Field(default=None, ge=0)
+    reason: str | None = None
+    # 插到这个条目之后；留空表示放在当天末尾
+    afterItemId: str | None = None
 
 
 class UpdateItineraryItemPayload(BaseModel):

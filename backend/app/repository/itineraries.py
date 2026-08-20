@@ -7,7 +7,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 from ..amap import AmapUnavailableError, search_poi
-from ..models import Itinerary, UpdateItineraryItemPayload
+from ..models import SLOT_ORDER, Itinerary, ItineraryItem, UpdateItineraryItemPayload
 from ..orm_models import ItineraryRecord, TripRecord
 from .covers import cover_url_from_days
 from .mappers import count_major_itinerary_items, itinerary_from_record
@@ -146,6 +146,59 @@ def delete_itinerary_item(db: Session, trip_id: str, day_number: int, item_id: s
 
     updated_itinerary = itinerary.model_copy(update={"days": updated_days})
     save_itinerary(db, trip_id, updated_itinerary, snapshot_label="删除条目")
+    return updated_itinerary
+
+
+def insert_itinerary_item(
+    db: Session,
+    trip_id: str,
+    day_number: int,
+    item: ItineraryItem,
+    after_item_id: str | None = None,
+) -> Itinerary | None:
+    """把一个已核实的条目插入某天。
+
+    只管落库——地名核实与条目构造在 `app/editing.py`，仓储层不反向依赖 agent 层。
+    找不到这一天返回 None；`after_item_id` 指不到时退回按时段排位，不报错：
+    位置偏一格是小事，为此让整条指令失败不值当。
+    """
+    itinerary = get_itinerary(db, trip_id)
+    if not itinerary:
+        return None
+
+    if all(day.day != day_number for day in itinerary.days):
+        return None
+
+    updated_days = []
+    for day in itinerary.days:
+        if day.day != day_number:
+            updated_days.append(day)
+            continue
+
+        items = list(day.items)
+        position = None
+
+        if after_item_id:
+            for index, existing in enumerate(items):
+                if existing.id == after_item_id:
+                    position = index + 1
+                    break
+
+        if position is None:
+            # 没指定位置就按时段排。不能盲目追加到末尾——时间线、PDF、地图动线
+            # 全都按数组顺序渲染，把一个「下午」追加到「傍晚返程高铁」后面，
+            # 整天的顺序就乱了。插到最后一个不晚于它的条目之后。
+            slot = SLOT_ORDER.get(item.timeSlot, 0)
+            position = 0
+            for index, existing in enumerate(items):
+                if SLOT_ORDER.get(existing.timeSlot, 0) <= slot:
+                    position = index + 1
+
+        items.insert(position, item)
+        updated_days.append(day.model_copy(update={"items": items}))
+
+    updated_itinerary = itinerary.model_copy(update={"days": updated_days})
+    save_itinerary(db, trip_id, updated_itinerary, snapshot_label="新增条目")
     return updated_itinerary
 
 

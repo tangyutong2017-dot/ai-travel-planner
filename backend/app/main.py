@@ -8,12 +8,14 @@ from sqlalchemy.orm import Session
 
 from .agent import get_generation_job, run_generation_job, start_generation_job
 from .amap import static_map_png
+from .editing import PlaceNotFoundError, build_verified_item
 from .db import get_db, init_db, SessionLocal
 from .models import (
     AgentJob,
     CreateTripPayload,
     CreateTripResponse,
     GenerateTripResponse,
+    InsertItineraryItemPayload,
     Itinerary,
     Trip,
     TripListResponse,
@@ -28,6 +30,7 @@ from .repository import (
     delete_trip,
     get_itinerary,
     get_trip,
+    insert_itinerary_item,
     list_trips,
     seed_initial_data,
     undo_count,
@@ -141,6 +144,30 @@ def delete_trip_item_route(
     updated = delete_itinerary_item(db, trip_id, day_number, item_id)
     if not updated:
         raise HTTPException(status_code=404, detail="没有找到这个行程项目")
+
+    return updated
+
+
+@app.post("/api/trips/{trip_id}/days/{day_number}/items", response_model=Itinerary)
+def insert_trip_item_route(
+    trip_id: str,
+    day_number: int,
+    payload: InsertItineraryItemPayload,
+    db: Session = Depends(get_db),
+) -> Itinerary:
+    itinerary = get_itinerary(db, trip_id)
+    if not itinerary:
+        raise HTTPException(status_code=404, detail="没有找到这个行程")
+
+    try:
+        item = build_verified_item(trip_id, day_number, itinerary.destination, payload)
+    except PlaceNotFoundError as exc:
+        # 如实说查不到，而不是放一个没有坐标的条目进去充数
+        raise HTTPException(status_code=422, detail=f"高德地图查不到「{exc.name}」，没有添加") from exc
+
+    updated = insert_itinerary_item(db, trip_id, day_number, item, payload.afterItemId)
+    if not updated:
+        raise HTTPException(status_code=404, detail="没有找到这一天")
 
     return updated
 

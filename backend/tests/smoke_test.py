@@ -139,6 +139,33 @@ check("无可撤销时返回 409", s == 409, f"{s} {d}")
 s, d = call("POST", "/api/trips/no_such_trip/undo")
 check("撤销不存在的行程返回 409", s == 409, f"{s} {d}")
 
+# --- 新增条目：必须过高德核实 (编辑 Agent 立项规划 §3.5b) ---
+# 编造的地名不能只是「查不到就拒绝」，更要挡住「匹配到另一个真实地点」——
+# 后者带着真实坐标、标着已核实，比直接拒绝更难发现。
+s, d = call("POST", f"/api/trips/{trip}/days/1/items",
+            {"title": "成都银河洗浴中心旗舰店", "timeSlot": "evening", "stopType": "activity"})
+check("编造的地名被拒绝", s == 422, f"{s} {d}")
+check("拒绝时说明查的是什么", s == 422 and "成都银河洗浴中心旗舰店" in str(d.get("detail", "")), str(d))
+
+s, d = call("POST", f"/api/trips/{trip}/days/1/items",
+            {"title": "宽窄巷子", "timeSlot": "afternoon", "stopType": "sight"})
+added = None
+if s == 200:
+    added = next((i for i in d["days"][0]["items"] if i["title"] == "宽窄巷子"), None)
+check("真实地名新增成功", s == 200 and added is not None, f"{s} {d}")
+check("新增条目已核实并带坐标",
+      added is not None and added["verification"] == "verified" and bool(added.get("location")), str(added))
+
+# 时间线、PDF、地图动线都按数组顺序渲染，插错位置整天顺序就乱了
+SLOTS = ["dawn", "morning", "noon", "afternoon", "evening", "night"]
+if s == 200:
+    seq = [SLOTS.index(i["timeSlot"]) for i in d["days"][0]["items"] if i["timeSlot"] in SLOTS]
+    check("新增后当天时段仍单调不减", seq == sorted(seq), str(seq))
+
+s, d = call("POST", f"/api/trips/{trip}/days/99/items",
+            {"title": "宽窄巷子", "timeSlot": "afternoon", "stopType": "sight"})
+check("往不存在的天新增返回 404", s == 404, f"{s} {d}")
+
 # --- 重命名行程 ---
 s, d = call("PATCH", f"/api/trips/{trip}", {"name": "成都三日测试"})
 check("重命名行程成功", s == 200 and d.get("name") == "成都三日测试", f"{s} {d}")

@@ -44,6 +44,7 @@ from .itineraries import (  # noqa: F401
     is_placeholder_item,
     fill_missing_poi_data,
     get_itinerary,
+    insert_itinerary_item,
     save_itinerary,
     update_itinerary_item,
 )
@@ -84,6 +85,7 @@ __all__ = [
     "list_trips",
     "make_trip_id",
     "now_iso",
+    "insert_itinerary_item",
     "save_itinerary",
     "undo_count",
     "undo_last_edit",
