@@ -60,9 +60,11 @@ function EmptyTrips({ onCreate }: { onCreate: () => void }) {
       {/* 功能亮点提示 */}
       <div className="mt-12 grid grid-cols-3 gap-6 max-w-lg">
         {[
-          { icon: "◈", title: "个性化偏好", desc: "根据兴趣、节奏、出行方式智能推荐" },
-          { icon: "▦", title: "可视化编辑", desc: "拖拽调整景点，实时预览路线" },
-          { icon: "⬡", title: "一键导出", desc: "PDF、日历、分享链接多格式输出" },
+          // 只写真的做了的。原文案许诺了拖拽排序、日历同步、分享链接，
+          // 而这三项都已明确记录为不做（见 docs/未来可能做的事.md）
+          { icon: "◈", title: "个性化偏好", desc: "按兴趣、节奏、同行关系与体力安排" },
+          { icon: "▦", title: "逐条可改", desc: "手动编辑，或用一句话让 AI 改，改错能撤销" },
+          { icon: "⬡", title: "导出行程册", desc: "杂志排版，浏览器直接存成 PDF" },
         ].map((f) => (
           <div key={f.title} className="text-center">
             <div className="w-8 h-8 rounded-lg border border-slate-200 bg-white flex items-center justify-center mx-auto mb-2 text-sky-600">
@@ -490,12 +492,9 @@ export function PageMyTrips({
                             onOpenTrip(t.id);
                           }}
                         />
-                        <button
-                          onClick={(event) => event.stopPropagation()}
-                          className="rounded-md border border-slate-200 bg-white px-3 py-1 text-[11px] font-mono text-slate-700 transition-all hover:-translate-y-px hover:border-sky-200 hover:bg-sky-50"
-                        >
-                          分享
-                        </button>
+                        {/* 原来这里有个「分享」按钮，onClick 只有 stopPropagation——
+                            点了什么都不会发生。分享链接需要公开只读页与鉴权，
+                            已明确记录为不做，那就不该在界面上留一个入口。 */}
                         <div className="relative">
                           <button
                             onClick={(event) => {

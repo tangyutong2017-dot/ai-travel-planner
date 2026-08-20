@@ -175,7 +175,7 @@ export function RightPanel({
 
       <div className="mt-auto border-t border-slate-100 p-3">
         <WBtn label="输出行程方案 →" primary className="w-full" onClick={onOutput} />
-        <WAnnotation text="导出 PDF / 分享链接" />
+        <WAnnotation text="可导出 PDF" />
       </div>
     </div>
   );
