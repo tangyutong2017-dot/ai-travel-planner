@@ -149,6 +149,27 @@ def delete_itinerary_item(db: Session, trip_id: str, day_number: int, item_id: s
     return updated_itinerary
 
 
+def insert_position(items: list[ItineraryItem], item: ItineraryItem, after_item_id: str | None) -> int:
+    """新条目该插在第几位。纯函数——对话编辑走内存执行，也要用同一套落位规则。
+
+    给了 after_item_id 就插在其后。没给（或指不到）则按时段排位，插到最后一个
+    不晚于它的条目之后：不能盲目追加到末尾——时间线、PDF、地图动线全都按数组
+    顺序渲染，把一个「下午」追加到「傍晚返程高铁」后面，整天的顺序就乱了。
+    """
+    if after_item_id:
+        for index, existing in enumerate(items):
+            if existing.id == after_item_id:
+                return index + 1
+
+    slot = SLOT_ORDER.get(item.timeSlot, 0)
+    position = 0
+    for index, existing in enumerate(items):
+        if SLOT_ORDER.get(existing.timeSlot, 0) <= slot:
+            position = index + 1
+
+    return position
+
+
 def insert_itinerary_item(
     db: Session,
     trip_id: str,
@@ -176,25 +197,7 @@ def insert_itinerary_item(
             continue
 
         items = list(day.items)
-        position = None
-
-        if after_item_id:
-            for index, existing in enumerate(items):
-                if existing.id == after_item_id:
-                    position = index + 1
-                    break
-
-        if position is None:
-            # 没指定位置就按时段排。不能盲目追加到末尾——时间线、PDF、地图动线
-            # 全都按数组顺序渲染，把一个「下午」追加到「傍晚返程高铁」后面，
-            # 整天的顺序就乱了。插到最后一个不晚于它的条目之后。
-            slot = SLOT_ORDER.get(item.timeSlot, 0)
-            position = 0
-            for index, existing in enumerate(items):
-                if SLOT_ORDER.get(existing.timeSlot, 0) <= slot:
-                    position = index + 1
-
-        items.insert(position, item)
+        items.insert(insert_position(items, item, after_item_id), item)
         updated_days.append(day.model_copy(update={"items": items}))
 
     updated_itinerary = itinerary.model_copy(update={"days": updated_days})

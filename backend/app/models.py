@@ -229,6 +229,44 @@ class Itinerary(BaseModel):
     days: list[DayPlan]
 
 
+class EditOp(BaseModel):
+    """模型吐出的一个编辑操作。
+
+    字段全部可选（op/day 除外），因为三种操作用到的字段不同；具体哪些必填
+    由 `editing.validate_ops` 逐条校验——放在这里会让三种操作互相污染。
+    """
+
+    op: Literal["update", "delete", "insert"]
+    day: int
+    itemId: str | None = None
+    title: str | None = None
+    stopType: StopType | None = None
+    timeSlot: TimeSlot | None = None
+    durationMin: int | None = Field(default=None, ge=0)
+    cost: int | None = Field(default=None, ge=0)
+    reason: str | None = None
+    afterItemId: str | None = None
+
+
+class ChatEditPayload(BaseModel):
+    message: str = Field(min_length=1, max_length=500)
+
+
+class ChatEditResult(BaseModel):
+    """一次对话编辑的结果。
+
+    `changes` 由代码依据**实际执行成功的操作**生成，不是模型写的——模型描述的是
+    它以为自己做了什么，操作被拒时它照样会说「已改好」（见立项文档第 7 节）。
+    `reply` 才是模型的话，仅作补充说明。
+    """
+
+    reply: str
+    changes: list[str] = Field(default_factory=list)
+    changedItemIds: list[str] = Field(default_factory=list)
+    itinerary: Itinerary | None = None
+    undoRemaining: int = 0
+
+
 class UndoResult(BaseModel):
     """还能撤几步；POST 时附带撤销后的行程。
 

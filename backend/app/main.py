@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
@@ -8,10 +9,12 @@ from sqlalchemy.orm import Session
 
 from .agent import get_generation_job, run_generation_job, start_generation_job
 from .amap import static_map_png
-from .editing import PlaceNotFoundError, build_verified_item
+from .editing import EditRejected, PlaceNotFoundError, apply_ops, build_verified_item, plan_edits
 from .db import get_db, init_db, SessionLocal
 from .models import (
     AgentJob,
+    ChatEditPayload,
+    ChatEditResult,
     CreateTripPayload,
     CreateTripResponse,
     GenerateTripResponse,
@@ -32,6 +35,7 @@ from .repository import (
     get_trip,
     insert_itinerary_item,
     list_trips,
+    save_itinerary,
     seed_initial_data,
     undo_count,
     undo_last_edit,
@@ -51,6 +55,8 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         db.close()
     yield
 
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Travel Planner API", version="0.1.0", lifespan=lifespan)
 
@@ -185,6 +191,61 @@ def update_trip_item_route(
         raise HTTPException(status_code=404, detail="没有找到这个行程项目")
 
     return updated
+
+
+@app.post("/api/trips/{trip_id}/chat", response_model=ChatEditResult)
+def chat_edit_route(
+    trip_id: str,
+    payload: ChatEditPayload,
+    db: Session = Depends(get_db),
+) -> ChatEditResult:
+    """用一句话修改行程。
+
+    走同步请求而非 job 轮询：实测单次 2.7~5.6 秒，而生成要 60~135 秒——
+    后者需要异步是因为要吐整份行程，这里只吐一两个操作。
+    """
+    itinerary = get_itinerary(db, trip_id)
+    if not itinerary:
+        raise HTTPException(status_code=404, detail="行程不存在或还没有生成过内容")
+
+    try:
+        ops, reply = plan_edits(itinerary, payload.message)
+    except EditRejected as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        # 模型超时或不可用。行程没动，如实说一句就好——内部细节只进日志
+        logger.exception("对话编辑调用模型失败 trip=%s", trip_id)
+        raise HTTPException(status_code=503, detail="AI 服务暂时不可用，行程未改动") from exc
+
+    # 模型只回文字不调工具是正常路径：它在澄清，或在说这件事做不到
+    if not ops:
+        return ChatEditResult(reply=reply or "我不太确定要改什么，换个说法再说一次？",
+                              undoRemaining=undo_count(db, trip_id))
+
+    try:
+        updated, changes, touched = apply_ops(itinerary, ops)
+    except EditRejected as exc:
+        # 全成功或全不动：一条校验不过就整条作废，不留中间状态
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    if not changes:
+        # 模型给了操作，但每个字段都与原值相同（常见于「改成 1 小时」而原本就是
+        # 60 分钟）。不写库、不留快照，也不谎称改过
+        return ChatEditResult(
+            reply=reply or "看下来这处本来就是这样，没有改动。",
+            undoRemaining=undo_count(db, trip_id),
+        )
+
+    # 一条指令一份快照——用户撤销时期望撤销的是「刚才那句话」，不是点三次
+    save_itinerary(db, trip_id, updated, snapshot_label=payload.message[:120])
+
+    return ChatEditResult(
+        reply=reply,
+        changes=changes,
+        changedItemIds=touched,
+        itinerary=updated,
+        undoRemaining=undo_count(db, trip_id),
+    )
 
 
 @app.get("/api/trips/{trip_id}/undo", response_model=UndoResult)
