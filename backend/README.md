@@ -29,7 +29,7 @@ VITE_API_BASE_URL=http://127.0.0.1:8000
 Working today:
 
 - PostgreSQL trip + itinerary + job storage (`db.py`, `orm_models.py`, `repository.py`)
-- REST API aligned with `docs/web-backend-data-contract.md` (`main.py`, `models.py`)
+- REST API contract lives in `app/models.py` (Pydantic) and is published as OpenAPI at `/docs`
 - Background job lifecycle for generation (`agent.py`)
 
 Available for the agent rewrite, not currently called:
