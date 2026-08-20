@@ -12,6 +12,7 @@
 
 import json
 import logging
+import re
 from typing import Any, get_args
 from uuid import uuid4
 
@@ -219,6 +220,8 @@ EDIT_SYSTEM_PROMPT = """你是行程编辑助手。用户会用自然语言提�
   以及「如果不是这个可以告诉我」。不要为此反问。
 - 位置不明确时自己定：新增条目按时段插到合理位置即可，不要问用户插在第几个。
 - 只有一种情况才反问：要求本身无法执行（例如要删的东西行程里根本没有）。
+- **绝不把改动挪到别的天去。** 用户说第几天就是第几天；那天不存在就直接说明行程只有
+  几天，不要「那我改第一天吧」——用户说 A 你改了 B，是最难被发现的错误。
 - **新增或替换地点前必须先调 search_places 搜一次**，再从返回结果里**原样复制**名称。
   不要凭记忆写店名——你不知道当地有哪些店，编出来的名字高德查不到，整条指令会作废。
   传 day 与 category 即可，系统会按那一天的位置搜周边；知道确切名字时才填 keyword。
@@ -259,6 +262,45 @@ def slim_itinerary(itinerary: Itinerary) -> dict[str, Any]:
 
 class EditRejected(Exception):
     """整条指令被拒。全成功或全不动——部分执行会留下用户无法理解的中间状态。"""
+
+
+CHINESE_DIGITS = {"一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "十": 10}
+DAY_REFERENCE = re.compile(r"第\s*([0-9]+|[一二两三四五六七八九十]+)\s*天|\b[Dd]([1-9][0-9]?)\b")
+
+
+def referenced_days(message: str) -> set[int]:
+    """从用户的话里抠出他指名的是第几天。识别「第二天」「第3天」「D2」。"""
+    days: set[int] = set()
+    for arabic_or_chinese, d_form in DAY_REFERENCE.findall(message):
+        raw = arabic_or_chinese or d_form
+        if not raw:
+            continue
+        if raw.isdigit():
+            days.add(int(raw))
+        elif raw in CHINESE_DIGITS:
+            days.add(CHINESE_DIGITS[raw])
+        elif raw.startswith("十") and raw[1:] in CHINESE_DIGITS:  # 十一 ~ 十九
+            days.add(10 + CHINESE_DIGITS[raw[1:]])
+
+    return days
+
+
+def guard_day_range(itinerary: Itinerary, message: str) -> None:
+    """用户指名的天不存在时，直接拒绝，不交给模型去发挥。
+
+    实测（天津 1 日行程）：用户说「第二天太赶了，删两个景点」，模型在回复里
+    写着「行程目前只有一天」，**却仍然把两个景点删在了第一天**。它知道那天不存在，
+    还是动了手——这是静默改指目标：用户说 A，系统对 B 执行了破坏性操作。
+
+    `apply_ops` 里那道 `op.day not in days` 拦不住，因为模型吐的就是合法的 day=1。
+    靠 prompt 约束也不可靠，模型会绕过去。所以在调模型之前先用代码挡掉，
+    顺带省一次往返。
+    """
+    total = len(itinerary.days)
+    out_of_range = sorted(day for day in referenced_days(message) if day < 1 or day > total)
+    if out_of_range:
+        named = "、".join(f"第 {day} 天" for day in out_of_range)
+        raise EditRejected(f"这份行程只有 {total} 天，没有{named}。请确认要改哪一天。")
 
 
 # 搜索最多来回两轮。一次搜不到合适的允许换个词再搜一次，再多就是在原地打转，
@@ -325,6 +367,8 @@ def plan_edits(itinerary: Itinerary, message: str) -> tuple[list[EditOp], str]:
 
     模型不调工具、只回文字是**正常路径**（澄清或说明做不到），此时操作列表为空。
     """
+    guard_day_range(itinerary, message)
+
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": EDIT_SYSTEM_PROMPT},
         {
